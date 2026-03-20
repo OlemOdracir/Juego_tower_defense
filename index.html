@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Iron Bastion - Tower Defense</title>
+  <link rel="stylesheet" href="/src/styles.css" />
+</head>
+<body>
+  <div id="game-container">
+    <!-- 3D Viewport -->
+    <div id="viewport">
+      <!-- HUD -->
+      <div id="hud">
+        <div>
+          <div>
+            <span class="hud-stat">💰 <span class="hud-val" id="credits">250</span></span>
+            <span class="hud-stat">🌊 <span class="hud-val" id="wave">0</span>/10</span>
+            <span class="hud-stat">Enemigos <span class="hud-val" id="enemy-count">0</span></span>
+          </div>
+          <div id="life-bar-wrap">
+            <div id="life-bar-outer"><div id="life-bar-fill"></div></div>
+          </div>
+        </div>
+        <div style="display:flex;gap:5px">
+          <button class="hud-btn" onclick="window.resetWave()">🔄 Oleada</button>
+          <button class="hud-btn" onclick="window.resetAll()">⏮ Todo</button>
+        </div>
+      </div>
+
+      <!-- Tower selector -->
+      <div class="tower-selector">
+        <div class="tower-card">
+          <div style="width:14px;height:14px;background:#378ADD;border-radius:3px;margin:0 auto 3px"></div>
+          MG-7<br><span style="color:#FACC15">$50</span>
+        </div>
+      </div>
+
+      <!-- Wave button -->
+      <button id="wave-btn" onclick="window.startWave()">▶ Oleada 1</button>
+
+      <!-- Tip -->
+      <div id="tip">Click = colocar · Click torre = inspeccionar · Scroll = zoom · Derecho = rotar</div>
+
+      <!-- Game Over overlay -->
+      <div id="overlay">
+        <h2 id="overlay-title"></h2>
+        <p id="overlay-text"></p>
+        <button style="background:#22C55E" onclick="window.resetWave()">🔄 Oleada</button>
+        <button style="background:#3B82F6" onclick="window.resetAll()">⏮ Todo</button>
+      </div>
+
+      <!-- Sell confirmation -->
+      <div id="confirm-dialog">
+        <div class="confirm-box">
+          <h3 id="confirm-title"></h3>
+          <p id="confirm-text"></p>
+          <div class="confirm-amount" id="confirm-amount"></div>
+          <div class="confirm-buttons">
+            <button class="confirm-no" onclick="window.cancelSell()">Cancelar</button>
+            <button class="confirm-yes" onclick="window.confirmSell()">Confirmar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Panel -->
+    <div id="panel" class="panel-empty">
+      <div id="preview-3d" style="display:none">
+        <div id="preview-label">DETALLE DE UNIDAD</div>
+      </div>
+      <div id="stats-section" style="display:none"></div>
+      <div id="actions-section" style="display:none"></div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
