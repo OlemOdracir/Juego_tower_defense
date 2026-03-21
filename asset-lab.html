@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Iron Bastion - MG-7 Asset Lab</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      font-family: 'Segoe UI', sans-serif;
+      color: #e2e8f0;
+      background:
+        radial-gradient(circle at 20% 15%, rgba(255, 210, 145, 0.14), transparent 25%),
+        radial-gradient(circle at 75% 18%, rgba(103, 197, 138, 0.12), transparent 22%),
+        linear-gradient(180deg, #101a25 0%, #09111b 100%);
+    }
+    #lab {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: minmax(320px, 1fr) 360px;
+      gap: 24px;
+      padding: 24px;
+      align-items: stretch;
+    }
+    #viewer-card,
+    #control-card {
+      border: 1px solid rgba(148, 163, 184, 0.16);
+      border-radius: 22px;
+      background: linear-gradient(180deg, rgba(16, 25, 37, 0.95), rgba(9, 17, 27, 0.95));
+      box-shadow: 0 24px 48px rgba(0, 0, 0, 0.28);
+      overflow: hidden;
+    }
+    #viewer-header,
+    #control-header {
+      padding: 20px 22px 14px;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+    }
+    .eyebrow {
+      font-size: 12px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: #7dd3fc;
+      font-weight: 700;
+    }
+    h1, h2 {
+      font-size: 28px;
+      font-weight: 900;
+      margin-top: 8px;
+      color: #f8fafc;
+    }
+    p {
+      color: #94a3b8;
+      line-height: 1.5;
+      margin-top: 8px;
+    }
+    #viewer {
+      height: calc(100vh - 132px);
+      min-height: 560px;
+    }
+    #control-card {
+      display: flex;
+      flex-direction: column;
+    }
+    #controls {
+      padding: 20px 22px 24px;
+      display: grid;
+      gap: 18px;
+    }
+    label {
+      display: block;
+      font-size: 12px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #cbd5e1;
+      margin-bottom: 8px;
+      font-weight: 700;
+    }
+    select, button {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 1px solid rgba(148, 163, 184, 0.16);
+      background: #111b27;
+      color: #f8fafc;
+      font-size: 14px;
+    }
+    button {
+      cursor: pointer;
+      font-weight: 700;
+      background: linear-gradient(180deg, #4f9c52, #407f43);
+      border-color: rgba(126, 211, 133, 0.3);
+    }
+    ul {
+      list-style: none;
+      display: grid;
+      gap: 10px;
+    }
+    li {
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: rgba(30, 41, 59, 0.52);
+      border: 1px solid rgba(148, 163, 184, 0.08);
+    }
+    li strong {
+      display: block;
+      color: #f8fafc;
+      margin-bottom: 4px;
+    }
+    #status {
+      color: #facc15;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    @media (max-width: 1080px) {
+      #lab {
+        grid-template-columns: 1fr;
+      }
+      #viewer {
+        height: 60vh;
+        min-height: 440px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="lab">
+    <section id="viewer-card">
+      <div id="viewer-header">
+        <div class="eyebrow">Asset Lab</div>
+        <h1>MG-7 Modular Turret</h1>
+        <p>Viewer aislado para revisar las 5 evoluciones del prototipo AA militar antes de integrarlo al juego.</p>
+      </div>
+      <div id="viewer"></div>
+    </section>
+    <aside id="control-card">
+      <div id="control-header">
+        <div class="eyebrow">Review</div>
+        <h2>Evoluciones</h2>
+        <p id="status">Cargando assets...</p>
+      </div>
+      <div id="controls">
+        <div>
+          <label for="level-select">Nivel</label>
+          <select id="level-select">
+            <option value="0">Nivel 1 · Cañón simple</option>
+            <option value="1">Nivel 2 · Doble cañón</option>
+            <option value="2">Nivel 3 · Triple cañón</option>
+            <option value="3">Nivel 4 · Quad cañón</option>
+            <option value="4">Nivel 5 · Gatling CIWS</option>
+          </select>
+        </div>
+        <button id="reload-btn" type="button">Recargar nivel actual</button>
+        <ul>
+          <li><strong>Chasis común</strong> La base y el cuerpo mantienen coherencia visual entre todos los niveles.</li>
+          <li><strong>Montaje AA</strong> El bloque de armas tiene pivote de elevación visible y no queda atrapado dentro del casco.</li>
+          <li><strong>Muzzle flash</strong> La bocacha se anima con una llamarada breve y periódica en el viewer.</li>
+          <li><strong>Preparado para integración</strong> Cada `.glb` exporta nodos `turret_yaw`, `gun_pitch` y `muzzle_*`.</li>
+        </ul>
+      </div>
+    </aside>
+  </div>
+  <script type="module" src="/src/asset-lab.js"></script>
+</body>
+</html>
