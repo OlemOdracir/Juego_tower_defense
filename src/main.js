@@ -266,7 +266,7 @@ function gameLoop() {
 
   tickSimulation(state, dt);
   towerRenderer.sync(state, elapsedTime);
-  enemyRenderer.sync(state, sceneRuntime.cameraAngle, elapsedTime);
+  enemyRenderer.sync(state, sceneRuntime.camera, sceneRuntime.cameraAngle, elapsedTime);
   projectileRenderer.syncProjectiles(state);
   projectileRenderer.handleEffects(consumeEffects(state), towerRenderer);
   projectileRenderer.updateParticles(dt);

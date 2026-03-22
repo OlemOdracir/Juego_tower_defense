@@ -52,14 +52,32 @@ function collectMuzzleNodes(root, nodeMap) {
   return muzzleNodes;
 }
 
-function attachHudDecorators(mesh, vehicleScale) {
+function attachHudDecorators(mesh, vehicleScale, vehicleHeight) {
   const hp = ENM.hpBar;
   const hpGroup = new THREE.Group();
-  hpGroup.position.y = hp.yOffset * vehicleScale;
-  hpGroup.add(mk(new THREE.PlaneGeometry(hp.background.width, hp.background.height), new THREE.MeshBasicMaterial({ color: hp.background.color, transparent: true, opacity: hp.background.opacity, side: THREE.DoubleSide })));
-  const hpFill = mk(new THREE.PlaneGeometry(hp.fill.width, hp.fill.height), new THREE.MeshBasicMaterial({ color: hp.colors.healthy, side: THREE.DoubleSide }));
+  hpGroup.position.y = Math.max(hp.minYOffset, vehicleHeight * hp.yOffsetHeightFactor) * vehicleScale;
+  const hpBackgroundMaterial = new THREE.MeshBasicMaterial({
+    color: hp.background.color,
+    transparent: true,
+    opacity: hp.background.opacity,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+    depthTest: false,
+  });
+  hpGroup.add(mk(new THREE.PlaneGeometry(hp.background.width, hp.background.height), hpBackgroundMaterial));
+  const hpFill = mk(
+    new THREE.PlaneGeometry(hp.fill.width, hp.fill.height),
+    new THREE.MeshBasicMaterial({
+      color: hp.colors.healthy,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      depthTest: false,
+    }),
+  );
   hpFill.position.z = 0.001;
+  hpFill.renderOrder = hp.renderOrder + 1;
   hpGroup.add(hpFill);
+  hpGroup.renderOrder = hp.renderOrder;
   mesh.add(hpGroup);
   mesh.userData.hpGroup = hpGroup;
   mesh.userData.hpFill = hpFill;
@@ -92,9 +110,10 @@ function buildPlaceholderVehicleMesh() {
   root.userData.vehicleScale = 1;
   root.userData.vehicleLength = 3.4;
   root.userData.vehicleWidth = 1.4;
+  root.userData.vehicleHeight = 0.7;
   root.userData.turretYaw = null;
   root.userData.muzzleNodes = [];
-  attachHudDecorators(root, 1);
+  attachHudDecorators(root, 1, 0.7);
   return root;
 }
 
@@ -129,6 +148,7 @@ function buildAssetVehicleMesh(definition) {
   root.userData.vehicleScale = vehicleScale;
   root.userData.vehicleLength = size.z;
   root.userData.vehicleWidth = size.x;
+  root.userData.vehicleHeight = size.y;
   root.userData.headingOffset = visualModel.headingOffset ?? 0;
 
   const nodeMap = visualModel.assetNodeMap;
@@ -144,7 +164,7 @@ function buildAssetVehicleMesh(definition) {
   }
   if (gunPitch) gunPitch.userData.restRotation = gunPitch.rotation.clone();
 
-  attachHudDecorators(root, vehicleScale);
+  attachHudDecorators(root, vehicleScale, size.y);
   return root;
 }
 
@@ -187,7 +207,7 @@ export class EnemyRenderer {
     this.pendingMeshes.set(enemy.id, promise);
   }
 
-  sync(state, cameraAngle, elapsedTime) {
+  sync(state, camera, cameraAngle, elapsedTime) {
     const targetedEnemyIds = new Set(state.towers.map((tower) => tower.targetEnemyId).filter(Boolean));
     const nextIds = new Set(state.enemies.map((enemy) => enemy.id));
     this.activeEnemyIds = nextIds;
@@ -202,6 +222,10 @@ export class EnemyRenderer {
     const hp = ENM.hpBar;
     const tm = ENM.targetMarker;
     const ta = ENM.turretAnimation;
+    const hpMode = ENM.hpBar.visibilityMode ?? 'always';
+    const cameraQuaternion = camera.quaternion;
+    const parentWorldQuaternion = new THREE.Quaternion();
+    const inverseParentQuaternion = new THREE.Quaternion();
 
     for (const enemy of state.enemies) {
       let mesh = this.meshes.get(enemy.id);
@@ -220,11 +244,21 @@ export class EnemyRenderer {
       mesh.userData.hpFill.scale.x = Math.max(0.01, hpRatio);
       mesh.userData.hpFill.position.x = -(1 - hpRatio) * hp.fill.halfWidth;
       mesh.userData.hpFill.material.color.setHex(hpRatio < hp.thresholds.critical ? hp.colors.critical : hpRatio < hp.thresholds.low ? hp.colors.low : hp.colors.healthy);
-      mesh.userData.hpGroup.rotation.y = -mesh.rotation.y + cameraAngle;
+      const hpGroup = mesh.userData.hpGroup;
+      const isTargeted = targetedEnemyIds.has(enemy.id);
+      if (hpMode === 'damaged-or-targeted') {
+        hpGroup.visible = hpRatio < 0.999 || isTargeted;
+      } else {
+        hpGroup.visible = true;
+      }
+      if (hpGroup.visible) {
+        mesh.getWorldQuaternion(parentWorldQuaternion);
+        inverseParentQuaternion.copy(parentWorldQuaternion).invert();
+        hpGroup.quaternion.copy(inverseParentQuaternion.multiply(cameraQuaternion));
+      }
 
       const targetMarker = mesh.userData.targetMarker;
       if (targetMarker) {
-        const isTargeted = targetedEnemyIds.has(enemy.id);
         targetMarker.visible = isTargeted;
         if (isTargeted) {
           targetMarker.rotation.y = cameraAngle;

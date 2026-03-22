@@ -12,6 +12,13 @@ Current generation path:
 - script: `scripts/blender_build_mg7.py`
 - output: `assets/models/turrets/mg7_modular/mg7_lvl1.glb` through `mg7_lvl5.glb`
 
+## Integrated VFX (MVP v2.1)
+
+- Vehicle destruction **explosion/fire flipbooks** are generated at runtime from internal canvas atlases.
+  - Implementation path: `src/game/runtime/renderers/projectile-renderer.js`
+  - Config path: `src/config/effects.js`
+  - License: in-project generated content (no external sprite sheet embedded)
+
 ## Integrated audio
 
 - Mixkit, `Game gun shot`

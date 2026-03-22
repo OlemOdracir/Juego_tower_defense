@@ -234,6 +234,35 @@ test('la economia suma recompensa por kill', () => {
   assert.equal(tower.kills, 1);
 });
 
+test('enemy-killed incluye reward y enemyTypeId en el efecto', () => {
+  const state = setupState();
+  const tower = placeTower(state, { towerTypeId: 'mg7-vulcan', gx: 1, gy: 1 });
+  const groundY = 0.01 * state.config.worldScale;
+  state.enemies.push({
+    id: 'enemy-a',
+    enemyTypeId: 'scout-buggy',
+    hp: 3,
+    maxHp: 3,
+    armor: 0,
+    reward: 12,
+    alive: true,
+    pathIndex: 0,
+    position: { x: tower.wx, y: groundY, z: tower.wz + 20 },
+    rotation: 0,
+  });
+
+  selectTargets(state);
+  for (let index = 0; index < 20; index++) {
+    applyCombatStep(state, 0.016);
+  }
+
+  const killEffect = state.effects.find((effect) => effect.type === 'enemy-killed');
+  assert.ok(killEffect);
+  assert.equal(killEffect.reward, 12);
+  assert.equal(killEffect.enemyTypeId, 'scout-buggy');
+  assert.ok(killEffect.position);
+});
+
 test('no permite mejorar por sobre el nivel maximo', () => {
   const state = setupState();
   const tower = placeTower(state, { towerTypeId: 'mg7-vulcan', gx: 1, gy: 1 });

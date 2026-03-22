@@ -348,6 +348,8 @@ export function applyCombatStep(state, dt) {
           color: FX.kill.color,
           count: FX.kill.count,
           enemyId: target.id,
+          enemyTypeId: target.enemyTypeId,
+          reward: target.reward,
         });
       }
 

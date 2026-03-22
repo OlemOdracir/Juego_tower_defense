@@ -33,11 +33,14 @@ export const RENDERING_CONFIG = {
   enemy: {
     bobbing: { amplitude: 0.003, frequency: 12, pathIndexMultiplier: 2 },
     hpBar: {
-      yOffset: 0.56,
+      visibilityMode: 'damaged-or-targeted',
+      minYOffset: 0.48,
+      yOffsetHeightFactor: 0.64,
       background: { width: 0.46, height: 0.05, color: 0x000000, opacity: 0.4 },
       fill: { width: 0.42, height: 0.034, halfWidth: 0.21 },
       colors: { healthy: 0x44dd44, low: 0xddaa44, critical: 0xdd4444 },
       thresholds: { critical: 0.3, low: 0.6 },
+      renderOrder: 1400,
     },
     targetMarker: {
       yOffset: 0.46,
