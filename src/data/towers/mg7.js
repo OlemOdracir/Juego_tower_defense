@@ -13,6 +13,14 @@ export const mg7TowerDefinition = {
     projectileSizeBase: 0.02,
     projectileSizePerLevel: 0.004,
     hitThreshold: 0.12,
+    muzzleHeightBase: 0.3,
+    muzzleHeightPerLevel: 0.025,
+    muzzleForwardBase: 0.38,
+    muzzleForwardPerLevel: 0.06,
+    pitchLimits: {
+      min: -0.72,
+      max: 0.5,
+    },
   },
   visualModel: {
     renderer: 'mg7-ciws',

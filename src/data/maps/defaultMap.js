@@ -18,5 +18,7 @@ export const defaultMapDefinition = {
     skyColor: 0x78b8e0,
     fogDensity: 0.014,
     rockCount: 12,
+    groundTileHeight: 0.04,
+    pathTileHeight: 0.08,
   },
 };

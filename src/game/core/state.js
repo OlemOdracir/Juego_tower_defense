@@ -1,3 +1,6 @@
+import { gridToWorld } from './coordinates.js';
+import { GAMEPLAY_CONFIG } from '../../config/gameplay.js';
+
 function cloneValue(value) {
   return globalThis.structuredClone ? globalThis.structuredClone(value) : JSON.parse(JSON.stringify(value));
 }
@@ -42,11 +45,7 @@ export function getTowerRange(definition, level) {
 }
 
 export function getCellWorldPosition(config, gx, gy) {
-  return {
-    x: gx - config.halfWidth + 0.5,
-    y: 0,
-    z: gy - config.halfHeight + 0.5,
-  };
+  return gridToWorld(gx, gy, config.worldScale, config.halfWidth, config.halfHeight);
 }
 
 export function createInitialState(config) {
@@ -74,7 +73,7 @@ export function createInitialState(config) {
       visible: false,
       title: '',
       text: '',
-      color: '#F8FAFC',
+      color: GAMEPLAY_CONFIG.overlays.defaultColor,
     },
   };
 }

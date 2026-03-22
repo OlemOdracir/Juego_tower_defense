@@ -1,0 +1,101 @@
+export const RENDERING_CONFIG = {
+  map: {
+    ground: { padding: 3.2, height: 0.12, yOffset: -0.06 },
+    subGround: { padding: 4.4, height: 0.3, yOffset: -0.25, color: 0x3d6630 },
+    tile: { size: 0.96, grassVarianceMin: 0.9, grassVarianceRange: 0.2 },
+    curb: { thickness: 0.06, height: 0.1, offset: 0.48, yOffset: 0.06 },
+    roadDash: { length: 0.3, width: 0.06, height: 0.01, yOffset: 0.085 },
+    rock: { sizeMin: 0.07, sizeRange: 0.1, positionSpread: 0.5 },
+    markers: {
+      spawn: {
+        color: 0xaa3333,
+        topRadius: 0.3,
+        bottomRadius: 0.35,
+        height: 0.12,
+        segments: 8,
+        yOffset: 0.06,
+        rotationSpeed: 1.5,
+      },
+      base: {
+        color: 0x2a7a2a,
+        topRadius: 0.3,
+        bottomRadius: 0.35,
+        height: 0.12,
+        segments: 8,
+        yOffset: 0.06,
+        rotationSpeed: -1.5,
+      },
+      baseBuilding: { size: 0.3, height: 0.25, color: 0x556655, yOffset: 0.125 },
+    },
+    rangeIndicator: { segments: 48, color: 0x66ff66, opacity: 0.1, yOffset: 0.05 },
+  },
+
+  enemy: {
+    bobbing: { amplitude: 0.003, frequency: 12, pathIndexMultiplier: 2 },
+    hpBar: {
+      yOffset: 0.56,
+      background: { width: 0.46, height: 0.05, color: 0x000000, opacity: 0.4 },
+      fill: { width: 0.42, height: 0.034, halfWidth: 0.21 },
+      colors: { healthy: 0x44dd44, low: 0xddaa44, critical: 0xdd4444 },
+      thresholds: { critical: 0.3, low: 0.6 },
+    },
+    targetMarker: {
+      yOffset: 0.46,
+      ring: { radius: 0.12, tube: 0.01, radialSegments: 8, tubularSegments: 24, color: 0xffcc55, opacity: 0.9 },
+      chevron: { radius: 0.035, height: 0.08, segments: 3, color: 0xffdd88, opacity: 0.95 },
+      bob: { base: 0.45, amplitude: 0.012, frequency: 6 },
+      opacityPulse: { base: 0.65, amplitude: 0.18, frequency: 8 },
+    },
+    turretAnimation: {
+      yawAmplitude: 0.12,
+      yawFrequency: 0.8,
+      pitchBase: -0.18,
+      pitchAmplitude: 0.04,
+      pitchFrequency: 1.6,
+    },
+  },
+
+  tower: {
+    animation: {
+      idlePitch: 0.08,
+      gatlingSpeedActive: 0.75,
+      gatlingSpeedIdle: 0.03,
+      ledPulse: { base: 0.3, amplitude: 0.3, frequency: 3 },
+    },
+    levelColors: [0x44ff44, 0x66ff44, 0xffff44, 0xffaa22, 0xff4444],
+    indicator: {
+      top: {
+        size: 0.022,
+        height: 0.015,
+        color: 0x9be56f,
+        emissive: 0x63d144,
+        emissiveIntensity: 0.7,
+        metalness: 0.4,
+        roughness: 0.35,
+        position: { x: 0.02, y: 0.27, z: 0.02 },
+      },
+      side: {
+        size: 0.018,
+        color: 0x8ce96a,
+        emissive: 0x59ce43,
+        emissiveIntensity: 0.6,
+        metalness: 0.35,
+        roughness: 0.32,
+        position: { x: 0.095, y: 0.03, z: 0.12 },
+      },
+      levelDot: {
+        radius: 0.005,
+        segments: 4,
+        spacing: 0.026,
+        emissiveIntensity: 0.5,
+        position: { x: -0.14, y: 0.03, z: 0.095 },
+      },
+    },
+    muzzleFlash: {
+      radius: 0.028,
+      segments: 10,
+      color: 0xffd37a,
+      scale: { x: 0.55, y: 0.55, z: 1.15 },
+    },
+  },
+};

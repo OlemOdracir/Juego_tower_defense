@@ -1,11 +1,15 @@
 import * as THREE from 'three';
-import { AUDIO_LEVELS } from '../audio/audio-config.js';
+import { AUDIO_CONFIG } from '../../../config/audio.js';
+import { EFFECTS_CONFIG } from '../../../config/effects.js';
 import { mk } from './materials.js';
 
+const FX = EFFECTS_CONFIG;
+
 export class ProjectileRenderer {
-  constructor(scene, sfxPlayer = null) {
+  constructor(scene, sfxPlayer = null, worldScale = 1) {
     this.scene = scene;
     this.sfxPlayer = sfxPlayer;
+    this.worldScale = worldScale;
     this.projectileMeshes = new Map();
     this.particles = [];
   }
@@ -22,14 +26,16 @@ export class ProjectileRenderer {
     for (const projectile of state.projectiles) {
       let mesh = this.projectileMeshes.get(projectile.id);
       if (!mesh) {
+        const s = this.worldScale;
+        const pr = FX.projectile;
         const group = new THREE.Group();
-        group.add(mk(new THREE.SphereGeometry(0.024, 6, 6), new THREE.MeshBasicMaterial({ color: 0xffee44 })));
+        group.add(mk(new THREE.SphereGeometry(pr.sphere.radius * s, pr.sphere.segments, pr.sphere.segments), new THREE.MeshBasicMaterial({ color: pr.sphere.color })));
         const trail = mk(
-          new THREE.CylinderGeometry(0.008, 0.003, 0.08, 4),
-          new THREE.MeshBasicMaterial({ color: 0xffaa22, transparent: true, opacity: 0.5 }),
+          new THREE.CylinderGeometry(pr.trail.topRadius * s, pr.trail.bottomRadius * s, pr.trail.height * s, 4),
+          new THREE.MeshBasicMaterial({ color: pr.trail.color, transparent: true, opacity: pr.trail.opacity }),
         );
         trail.rotation.x = Math.PI / 2;
-        trail.position.z = -0.04;
+        trail.position.z = pr.trail.zOffset * s;
         group.add(trail);
         this.scene.add(group);
         mesh = group;
@@ -37,6 +43,8 @@ export class ProjectileRenderer {
       }
 
       mesh.position.set(projectile.x, projectile.y, projectile.z);
+      const direction = new THREE.Vector3(projectile.vx ?? 0, projectile.vy ?? 0, projectile.vz ?? 1).normalize();
+      mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), direction);
     }
   }
 
@@ -45,78 +53,84 @@ export class ProjectileRenderer {
       if (effect.type === 'projectile-fired') {
         const turret = towerRenderer.getTurret(effect.towerId);
         if (!turret) continue;
-        const barrelData = turret.userData.barrelData ?? [];
-        if (barrelData.length === 0) continue;
-        const barrel = barrelData[effect.fireIndex % barrelData.length];
-        const flash = mk(new THREE.SphereGeometry(0.02, 4, 4), new THREE.MeshBasicMaterial({ color: 0xffffaa }));
-        flash.position.set(barrel.ox, barrel.oy, barrel.tipZ + 0.12);
-        turret.add(flash);
-        this.particles.push({ mesh: flash, life: 0.035, parent: turret, local: true });
+        const mf = FX.muzzleFlash;
+        const muzzleWorldPosition = towerRenderer.getMuzzleWorldPosition(effect.towerId, effect.fireIndex, mf.forwardOffset * this.worldScale);
+        if (!muzzleWorldPosition) continue;
+        const flash = mk(new THREE.SphereGeometry(mf.radius * this.worldScale, mf.segments, mf.segments), new THREE.MeshBasicMaterial({ color: mf.color }));
+        flash.position.copy(muzzleWorldPosition);
+        this.scene.add(flash);
+        this.particles.push({ mesh: flash, life: mf.lifetime, local: false, impactPulse: true });
+        const mg7 = AUDIO_CONFIG.mg7Shot;
         this.sfxPlayer?.play('mg7-shot', {
-          volume: AUDIO_LEVELS.mg7Shot,
-          playbackRate: 0.99 + Math.random() * 0.04,
-          cooldownMs: 0,
+          volume: AUDIO_CONFIG.levels.mg7Shot,
+          playbackRate: mg7.playbackRateMin + Math.random() * mg7.playbackRateRange,
+          cooldownMs: mg7.cooldownMs,
         });
       } else if (effect.type === 'hit' || effect.type === 'enemy-killed') {
         if (effect.type === 'hit') {
+          const hs = FX.hitSpark;
           const spark = mk(
-            new THREE.SphereGeometry(0.028, 6, 6),
-            new THREE.MeshBasicMaterial({ color: 0xffdd77, transparent: true, opacity: 0.82 }),
+            new THREE.SphereGeometry(hs.radius * this.worldScale, hs.segments, hs.segments),
+            new THREE.MeshBasicMaterial({ color: hs.color, transparent: true, opacity: hs.opacity }),
           );
           spark.position.set(effect.position.x, effect.position.y, effect.position.z);
           this.scene.add(spark);
           this.particles.push({
             mesh: spark,
-            life: 0.08,
+            life: hs.lifetime,
             local: false,
             impactPulse: true,
           });
         }
 
         if (effect.type === 'enemy-killed') {
+          const bl = FX.explosion.blast;
           const blast = mk(
-            new THREE.SphereGeometry(0.12, 10, 10),
-            new THREE.MeshBasicMaterial({ color: 0xffaa33, transparent: true, opacity: 0.9 }),
+            new THREE.SphereGeometry(bl.radius * this.worldScale, bl.segments, bl.segments),
+            new THREE.MeshBasicMaterial({ color: bl.color, transparent: true, opacity: bl.opacity }),
           );
-          blast.position.set(effect.position.x, effect.position.y + 0.08, effect.position.z);
+          blast.position.set(effect.position.x, effect.position.y + bl.yOffset * this.worldScale, effect.position.z);
           this.scene.add(blast);
           this.particles.push({
             mesh: blast,
-            life: 0.16,
+            life: bl.lifetime,
             local: false,
             explosionFlash: true,
           });
+          const sm = FX.explosion.smoke;
           const smoke = mk(
-            new THREE.SphereGeometry(0.09, 8, 8),
-            new THREE.MeshBasicMaterial({ color: 0x4b5563, transparent: true, opacity: 0.65 }),
+            new THREE.SphereGeometry(sm.radius * this.worldScale, sm.segments, sm.segments),
+            new THREE.MeshBasicMaterial({ color: sm.color, transparent: true, opacity: sm.opacity }),
           );
-          smoke.position.set(effect.position.x, effect.position.y + 0.08, effect.position.z);
+          smoke.position.set(effect.position.x, effect.position.y + bl.yOffset * this.worldScale, effect.position.z);
           this.scene.add(smoke);
           this.particles.push({
             mesh: smoke,
-            life: 0.45,
+            life: sm.lifetime,
             local: false,
             smokeCloud: true,
-            vy: 0.16,
+            vy: sm.upwardSpeed * this.worldScale,
           });
+          const ve = AUDIO_CONFIG.vehicleExplosion;
           this.sfxPlayer?.play('vehicle-explosion', {
-            volume: AUDIO_LEVELS.vehicleExplosion,
-            playbackRate: 0.95 + Math.random() * 0.08,
-            cooldownMs: 40,
+            volume: AUDIO_CONFIG.levels.vehicleExplosion,
+            playbackRate: ve.playbackRateMin + Math.random() * ve.playbackRateRange,
+            cooldownMs: ve.cooldownMs,
           });
         }
 
+        const db = FX.debris;
         for (let index = 0; index < effect.count; index++) {
-          const size = 0.015 + Math.random() * 0.02;
+          const size = (db.sizeMin + Math.random() * db.sizeRange) * this.worldScale;
           const mesh = mk(new THREE.BoxGeometry(size, size, size), new THREE.MeshBasicMaterial({ color: effect.color }));
           mesh.position.set(effect.position.x, effect.position.y, effect.position.z);
           this.scene.add(mesh);
           this.particles.push({
             mesh,
-            life: 0.25 + Math.random() * 0.15,
-            vx: (Math.random() - 0.5) * 3,
-            vy: Math.random() * 3 + 1.5,
-            vz: (Math.random() - 0.5) * 3,
+            life: db.lifetimeMin + Math.random() * db.lifetimeRange,
+            vx: (Math.random() - 0.5) * db.velocity.horizontal * this.worldScale,
+            vy: (Math.random() * db.velocity.verticalRange + db.velocity.verticalMin) * this.worldScale,
+            vz: (Math.random() - 0.5) * db.velocity.horizontal * this.worldScale,
             local: false,
           });
         }
@@ -125,6 +139,11 @@ export class ProjectileRenderer {
   }
 
   updateParticles(dt) {
+    const bl = FX.explosion.blast;
+    const hs = FX.hitSpark;
+    const sm = FX.explosion.smoke;
+    const db = FX.debris;
+
     this.particles = this.particles.filter((particle) => {
       particle.life -= dt;
       if (particle.life <= 0) {
@@ -138,22 +157,22 @@ export class ProjectileRenderer {
 
       if (!particle.local) {
         if (particle.explosionFlash) {
-          const growth = 1 + dt * 10;
+          const growth = 1 + dt * bl.growthRate;
           particle.mesh.scale.multiplyScalar(growth);
-          particle.mesh.material.opacity = Math.max(0, particle.life / 0.16);
+          particle.mesh.material.opacity = Math.max(0, particle.life / bl.lifetime);
         } else if (particle.impactPulse) {
-          particle.mesh.scale.multiplyScalar(1 + dt * 18);
-          particle.mesh.material.opacity = Math.max(0, particle.life / 0.08);
+          particle.mesh.scale.multiplyScalar(1 + dt * hs.growthRate);
+          particle.mesh.material.opacity = Math.max(0, particle.life / hs.lifetime);
         } else if (particle.smokeCloud) {
           particle.mesh.position.y += particle.vy * dt;
-          particle.mesh.scale.multiplyScalar(1 + dt * 2.6);
-          particle.mesh.material.opacity = Math.max(0, particle.life / 0.45) * 0.55;
+          particle.mesh.scale.multiplyScalar(1 + dt * sm.growthRate);
+          particle.mesh.material.opacity = Math.max(0, particle.life / sm.lifetime) * sm.opacityMultiplier;
         } else {
-          particle.vy -= 12 * dt;
+          particle.vy -= db.gravity * this.worldScale * dt;
           particle.mesh.position.x += particle.vx * dt;
           particle.mesh.position.y += particle.vy * dt;
           particle.mesh.position.z += particle.vz * dt;
-          particle.mesh.material.opacity = Math.max(0, particle.life / 0.35);
+          particle.mesh.material.opacity = Math.max(0, particle.life / db.opacityLifetime);
           particle.mesh.material.transparent = true;
         }
       }

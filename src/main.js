@@ -3,6 +3,7 @@ import {
   consumeEffects,
   createGameConfig,
   createInitialState,
+  worldToGrid,
   resetAll,
   resetWave,
   placeTower,
@@ -11,9 +12,12 @@ import {
   tickSimulation,
   upgradeTower,
 } from './game/core/index.js';
+import { GAMEPLAY_CONFIG } from './config/gameplay.js';
+import { FRAMING_CONFIG } from './config/framing.js';
 import { HudPresenter } from './game/runtime/presenters/hud-presenter.js';
 import { TowerPanelPresenter } from './game/runtime/presenters/tower-panel-presenter.js';
 import { SfxPlayer } from './game/runtime/audio/sfx-player.js';
+import { createLayoutCoordinator } from './game/runtime/layout/layout-coordinator.js';
 import { TowerPreview } from './game/runtime/preview/tower-preview.js';
 import { EnemyRenderer } from './game/runtime/renderers/enemy-renderer.js';
 import { MapRenderer } from './game/runtime/renderers/map-renderer.js';
@@ -24,8 +28,14 @@ import { createSceneRuntime } from './game/runtime/scene-runtime.js';
 const config = createGameConfig();
 const state = createInitialState(config);
 
+const layoutCoordinator = createLayoutCoordinator(document);
 const viewportEl = document.getElementById('viewport');
-const sceneRuntime = createSceneRuntime(viewportEl, config.mapDefinition);
+const sceneRuntime = createSceneRuntime({
+  viewportEl,
+  mapDefinition: config.mapDefinition,
+  worldScale: config.worldScale,
+  framingConfig: FRAMING_CONFIG,
+});
 const mapRenderer = new MapRenderer(sceneRuntime.scene, config);
 mapRenderer.build();
 
@@ -35,10 +45,13 @@ sfxPlayer.load('mg7-shot', new URL('../assets/audio/mg7/mg7-single-shot.mp3', im
 sfxPlayer.load('scout-engine', new URL('../assets/audio/vehicles/light-vehicle-engine.wav', import.meta.url).href).catch(() => {});
 sfxPlayer.load('vehicle-explosion', new URL('../assets/audio/vehicles/car-explosion-debris.mp3', import.meta.url).href).catch(() => {});
 
-const towerRenderer = new TowerRenderer(sceneRuntime.scene, config.towerDefinitions);
-const enemyRenderer = new EnemyRenderer(sceneRuntime.scene, sfxPlayer);
-const projectileRenderer = new ProjectileRenderer(sceneRuntime.scene, sfxPlayer);
-const towerPreview = new TowerPreview(document.getElementById('preview-3d'), (towerTypeId, level) => towerRenderer.buildMesh(towerTypeId, level));
+const towerRenderer = new TowerRenderer(sceneRuntime.scene, config.towerDefinitions, config.worldScale);
+const enemyRenderer = new EnemyRenderer(sceneRuntime.scene, config.enemyDefinitions, sfxPlayer, config.worldScale);
+const projectileRenderer = new ProjectileRenderer(sceneRuntime.scene, sfxPlayer, config.worldScale);
+const previewTowerRenderer = new TowerRenderer(null, config.towerDefinitions, 1);
+const towerPreview = new TowerPreview(document.getElementById('preview-3d'), (towerTypeId, level) =>
+  previewTowerRenderer.buildMesh(towerTypeId, level),
+);
 const hudPresenter = new HudPresenter(document);
 const panelPresenter = new TowerPanelPresenter(document, towerPreview);
 
@@ -55,6 +68,7 @@ let pendingSellTowerId = null;
 function renderUi() {
   hudPresenter.render(state);
   panelPresenter.render(state);
+  document.body.classList.toggle('overlay-active', Boolean(state.overlay?.visible));
   refreshHover();
 }
 
@@ -75,8 +89,7 @@ function getGridCell(event) {
   const point = new THREE.Vector3();
   if (!raycaster.ray.intersectPlane(plane, point)) return null;
 
-  const gx = Math.floor(point.x + config.halfWidth);
-  const gy = Math.floor(point.z + config.halfHeight);
+  const { gx, gy } = worldToGrid(point.x, point.z, config.worldScale, config.halfWidth, config.halfHeight);
   if (gx < 0 || gx >= config.mapDefinition.width || gy < 0 || gy >= config.mapDefinition.height) {
     return null;
   }
@@ -139,7 +152,7 @@ window.cancelSell = closeConfirmDialog;
 sceneRuntime.renderer.domElement.addEventListener('mousemove', (event) => {
   if (dragging) {
     const dx = event.clientX - lastMouseX;
-    if (Math.abs(dx) > 2) didDrag = true;
+    if (Math.abs(dx) > GAMEPLAY_CONFIG.ui.dragThreshold) didDrag = true;
     lastMouseX = event.clientX;
     sceneRuntime.rotate(dx);
     return;
@@ -206,12 +219,49 @@ sceneRuntime.renderer.domElement.addEventListener(
 );
 
 window.addEventListener('resize', () => {
+  layoutCoordinator.apply();
   sceneRuntime.resize();
 });
 
+window.visualViewport?.addEventListener('resize', () => {
+  layoutCoordinator.apply();
+  sceneRuntime.resize();
+});
+
+window.__layoutAudit = {
+  getMetrics() {
+    const panelRect = document.getElementById('panel')?.getBoundingClientRect();
+    const viewportRect = document.getElementById('viewport')?.getBoundingClientRect();
+    const containerRect = document.getElementById('game-container')?.getBoundingClientRect();
+    const canvasRect = sceneRuntime.renderer.domElement.getBoundingClientRect();
+    const rootStyles = getComputedStyle(document.documentElement);
+    return {
+      innerWidth: window.innerWidth,
+      innerHeight: window.innerHeight,
+      devicePixelRatio: window.devicePixelRatio,
+      appWidthVar: rootStyles.getPropertyValue('--cfg-app-width').trim(),
+      appHeightVar: rootStyles.getPropertyValue('--cfg-app-height').trim(),
+      appLeftVar: rootStyles.getPropertyValue('--cfg-app-left').trim(),
+      appTopVar: rootStyles.getPropertyValue('--cfg-app-top').trim(),
+      bottomBufferVar: rootStyles.getPropertyValue('--cfg-window-bottom-buffer').trim(),
+      panelTop: panelRect?.top ?? null,
+      panelBottom: panelRect?.bottom ?? null,
+      viewportBottom: viewportRect?.bottom ?? null,
+      containerLeft: containerRect?.left ?? null,
+      containerTop: containerRect?.top ?? null,
+      containerRight: containerRect?.right ?? null,
+      containerBottom: containerRect?.bottom ?? null,
+      canvasLeft: canvasRect?.left ?? null,
+      canvasRight: canvasRect?.right ?? null,
+      projectedPlayableBounds: sceneRuntime.getProjectedPlayableBounds(),
+      framing: sceneRuntime.framing,
+    };
+  },
+};
+
 function gameLoop() {
   requestAnimationFrame(gameLoop);
-  const dt = Math.min(clock.getDelta(), 0.05);
+  const dt = Math.min(clock.getDelta(), GAMEPLAY_CONFIG.simulation.maxDeltaTime);
   elapsedTime += dt;
 
   tickSimulation(state, dt);

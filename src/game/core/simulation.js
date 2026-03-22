@@ -4,11 +4,16 @@ import {
   createWaveSnapshot,
   getCellWorldPosition,
   getTowerLevel,
-  getTowerRange,
   markUiDirty,
   markWorldDirty,
   queueEffect,
 } from './state.js';
+import { clampMg7Pitch, getMg7Direction, getMg7MuzzleWorld } from '../shared/mg7-geometry.js';
+import { GAMEPLAY_CONFIG } from '../../config/gameplay.js';
+
+const SIM = GAMEPLAY_CONFIG.simulation;
+const FX = GAMEPLAY_CONFIG.effects;
+const OVR = GAMEPLAY_CONFIG.overlays;
 
 function getTowerDefinition(state, tower) {
   return state.config.towerDefinitions[tower.towerTypeId];
@@ -40,7 +45,7 @@ function createEnemyInstance(state, enemyTypeId) {
     hp: definition.stats.hp,
     maxHp: definition.stats.hp,
     armor: definition.stats.armor,
-    speed: definition.stats.speed,
+    speed: definition.stats.speed * state.config.worldScale,
     reward: definition.stats.reward,
     pathIndex: 0,
     progress: 0,
@@ -48,6 +53,10 @@ function createEnemyInstance(state, enemyTypeId) {
     position: { ...startPos },
     rotation: 0,
   };
+}
+
+function getTowerMuzzleOrigin(definition, tower, worldScale, fireIndex = 0) {
+  return getMg7MuzzleWorld(tower, definition.levels[tower.level].scale, worldScale, fireIndex);
 }
 
 function updateEnemyMovement(state, enemy, dt) {
@@ -76,9 +85,9 @@ function updateEnemyMovement(state, enemy, dt) {
         state.victory = false;
         state.overlay = {
           visible: true,
-          title: 'Game Over',
+          title: OVR.gameOver.title,
           text: `Oleada ${state.wave}`,
-          color: '#EF4444',
+          color: OVR.gameOver.color,
         };
         markUiDirty(state);
       }
@@ -89,7 +98,7 @@ function updateEnemyMovement(state, enemy, dt) {
   const segmentFrom = pathWorld[enemy.pathIndex];
   const segmentTo = pathWorld[enemy.pathIndex + 1];
   enemy.position.x = lerp(segmentFrom.x, segmentTo.x, enemy.progress);
-  enemy.position.y = 0.01;
+  enemy.position.y = lerp(segmentFrom.y, segmentTo.y, enemy.progress);
   enemy.position.z = lerp(segmentFrom.z, segmentTo.z, enemy.progress);
 
   const dirX = segmentTo.x - segmentFrom.x;
@@ -98,7 +107,7 @@ function updateEnemyMovement(state, enemy, dt) {
   let diff = targetAngle - enemy.rotation;
   while (diff > Math.PI) diff -= Math.PI * 2;
   while (diff < -Math.PI) diff += Math.PI * 2;
-  enemy.rotation += diff * Math.min(1, dt * 8);
+  enemy.rotation += diff * Math.min(1, dt * SIM.enemyRotationLerp);
 }
 
 export function placeTower(state, placement) {
@@ -128,6 +137,7 @@ export function placeTower(state, placement) {
     invested: definition.economy.baseCost,
     fireIndex: 0,
     aimAngle: 0,
+    aimPitch: SIM.defaultAimPitch,
     hasTarget: false,
   };
 
@@ -193,8 +203,8 @@ export function startWave(state) {
   state.activeWaveDefinition = cloneStateValue(waveDefinition);
   state.wave += 1;
   state.waveActive = true;
-  state.spawnQueue = Array.from({ length: waveDefinition.count }, () => waveDefinition.enemyTypeId);
-  state.spawnTimer = 0.4;
+  state.spawnQueue = waveDefinition.spawns ? [...waveDefinition.spawns] : Array.from({ length: waveDefinition.count }, () => waveDefinition.enemyTypeId);
+  state.spawnTimer = SIM.initialSpawnDelay;
   markUiDirty(state);
   return true;
 }
@@ -208,8 +218,9 @@ export function selectTargets(state) {
 
     for (const enemy of state.enemies) {
       if (!enemy.alive) continue;
+      const range = stats.range * state.config.worldScale;
       const distance = distance2d(enemy.position.x, enemy.position.z, tower.wx, tower.wz);
-      if (distance <= stats.range && distance < nearestDistance) {
+      if (distance <= range && distance < nearestDistance) {
         nearest = enemy;
         nearestDistance = distance;
       }
@@ -217,10 +228,17 @@ export function selectTargets(state) {
 
     tower.hasTarget = Boolean(nearest);
     if (nearest) {
-      tower.aimAngle = Math.atan2(nearest.position.x - tower.wx, nearest.position.z - tower.wz);
+      const dx = nearest.position.x - tower.wx;
+      const dz = nearest.position.z - tower.wz;
+      const muzzleOrigin = getTowerMuzzleOrigin(definition, tower, state.config.worldScale, tower.fireIndex);
+      const dy = nearest.position.y - muzzleOrigin.y;
+      tower.aimAngle = Math.atan2(dx, dz);
+      const pitchLimits = definition.combatModel.pitchLimits ?? SIM.defaultPitchLimits;
+      tower.aimPitch = clampMg7Pitch(-Math.atan2(dy, Math.hypot(dx, dz)), pitchLimits.min, pitchLimits.max);
       tower.targetEnemyId = nearest.id;
     } else {
       tower.targetEnemyId = null;
+      tower.aimPitch = SIM.defaultAimPitch;
     }
   }
 
@@ -240,14 +258,21 @@ function spawnEnemy(state, enemyTypeId) {
 function fireProjectile(state, tower, enemy) {
   const definition = getTowerDefinition(state, tower);
   const stats = getTowerLevel(definition, tower.level);
+  const fireIndex = tower.fireIndex;
+  const muzzleOrigin = getTowerMuzzleOrigin(definition, tower, state.config.worldScale, fireIndex);
+  const shotDirection = getMg7Direction(tower.aimAngle, tower.aimPitch);
   const projectile = {
     id: allocateId('projectile'),
     towerId: tower.id,
     targetEnemyId: enemy.id,
-    x: tower.wx,
-    y: 0.35,
-    z: tower.wz,
-    speed: definition.combatModel.projectileSpeed,
+    x: muzzleOrigin.x,
+    y: muzzleOrigin.y,
+    z: muzzleOrigin.z,
+    vx: shotDirection.x,
+    vy: shotDirection.y,
+    vz: shotDirection.z,
+    speed: definition.combatModel.projectileSpeed * state.config.worldScale,
+    hitThreshold: definition.combatModel.hitThreshold * state.config.worldScale,
     damage: stats.damage,
     alive: true,
   };
@@ -257,7 +282,7 @@ function fireProjectile(state, tower, enemy) {
     type: 'projectile-fired',
     towerId: tower.id,
     enemyId: enemy.id,
-    fireIndex: tower.fireIndex,
+    fireIndex,
   });
   tower.fireIndex += 1;
 }
@@ -292,21 +317,21 @@ export function applyCombatStep(state, dt) {
       continue;
     }
 
-    const direction = {
+    const directionToTarget = {
       x: target.position.x - projectile.x,
       y: target.position.y - projectile.y,
       z: target.position.z - projectile.z,
     };
-    const length = Math.hypot(direction.x, direction.y, direction.z);
+    const length = Math.hypot(directionToTarget.x, directionToTarget.y, directionToTarget.z);
 
-    if (length < 0.12) {
+    if (length < projectile.hitThreshold) {
       const damage = Math.max(0, projectile.damage - target.armor);
       target.hp -= damage;
       queueEffect(state, {
         type: 'hit',
         position: { x: projectile.x, y: projectile.y, z: projectile.z },
-        color: 0xffcc22,
-        count: 3,
+        color: FX.hit.color,
+        count: FX.hit.count,
       });
 
       if (target.hp <= 0) {
@@ -320,8 +345,8 @@ export function applyCombatStep(state, dt) {
         queueEffect(state, {
           type: 'enemy-killed',
           position: { ...target.position },
-          color: 0xff4400,
-          count: 6,
+          color: FX.kill.color,
+          count: FX.kill.count,
           enemyId: target.id,
         });
       }
@@ -331,16 +356,16 @@ export function applyCombatStep(state, dt) {
     }
 
     const step = projectile.speed * dt;
-    projectile.x += (direction.x / length) * step;
-    projectile.y += (direction.y / length) * step;
-    projectile.z += (direction.z / length) * step;
+    projectile.x += projectile.vx * step;
+    projectile.y += projectile.vy * step;
+    projectile.z += projectile.vz * step;
   }
 
   state.projectiles = state.projectiles.filter((item) => item.alive);
 }
 
 export function tickSimulation(state, dt) {
-  const clampedDt = Math.min(dt, 0.05);
+  const clampedDt = Math.min(dt, SIM.maxDeltaTime);
 
   if (state.gameOver) {
     return {
@@ -354,7 +379,7 @@ export function tickSimulation(state, dt) {
     if (state.spawnTimer <= 0) {
       const enemyTypeId = state.spawnQueue.shift();
       spawnEnemy(state, enemyTypeId);
-      state.spawnTimer = state.spawnQueue.length > 0 ? state.activeWaveDefinition.interval : 0.5;
+      state.spawnTimer = state.spawnQueue.length > 0 ? state.activeWaveDefinition.interval : SIM.finalEnemySpacing;
     }
   }
 
@@ -377,9 +402,9 @@ export function tickSimulation(state, dt) {
       state.victory = true;
       state.overlay = {
         visible: true,
-        title: '¡Victoria!',
+        title: OVR.victory.title,
         text: `Base defendida · ${state.lives} vidas · $${state.credits}`,
-        color: '#22C55E',
+        color: OVR.victory.color,
       };
       markUiDirty(state);
     }

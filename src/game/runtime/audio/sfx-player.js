@@ -1,3 +1,7 @@
+import { AUDIO_CONFIG } from '../../../config/audio.js';
+
+const DEFAULTS = AUDIO_CONFIG.defaults;
+
 export class SfxPlayer {
   constructor() {
     this.context = null;
@@ -71,7 +75,7 @@ export class SfxPlayer {
     source.playbackRate.value = options.playbackRate ?? 1;
 
     const gainNode = context.createGain();
-    gainNode.gain.value = options.volume ?? 0.45;
+    gainNode.gain.value = options.volume ?? DEFAULTS.playVolume;
 
     source.connect(gainNode);
     gainNode.connect(context.destination);
@@ -94,7 +98,7 @@ export class SfxPlayer {
     source.playbackRate.value = options.playbackRate ?? 1;
 
     const gainNode = context.createGain();
-    gainNode.gain.value = options.volume ?? 0.2;
+    gainNode.gain.value = options.volume ?? DEFAULTS.loopVolume;
 
     source.connect(gainNode);
     gainNode.connect(context.destination);
@@ -103,7 +107,7 @@ export class SfxPlayer {
     return true;
   }
 
-  setLoopVolume(id, volume, rampMs = 120) {
+  setLoopVolume(id, volume, rampMs = DEFAULTS.rampMs) {
     const context = this.ensureContext();
     const activeLoop = this.activeLoops.get(id);
     if (!context || !activeLoop) return false;
@@ -115,7 +119,7 @@ export class SfxPlayer {
     return true;
   }
 
-  stopLoop(id, fadeOutMs = 120) {
+  stopLoop(id, fadeOutMs = DEFAULTS.fadeOutMs) {
     const context = this.ensureContext();
     const activeLoop = this.activeLoops.get(id);
     if (!context || !activeLoop) return false;
@@ -124,7 +128,7 @@ export class SfxPlayer {
     activeLoop.gainNode.gain.cancelScheduledValues(now);
     activeLoop.gainNode.gain.setValueAtTime(activeLoop.gainNode.gain.value, now);
     activeLoop.gainNode.gain.linearRampToValueAtTime(0.0001, now + fadeOutMs / 1000);
-    activeLoop.source.stop(now + fadeOutMs / 1000 + 0.02);
+    activeLoop.source.stop(now + fadeOutMs / 1000 + DEFAULTS.stopDelay);
     activeLoop.source.onended = () => {
       activeLoop.source.disconnect();
       activeLoop.gainNode.disconnect();

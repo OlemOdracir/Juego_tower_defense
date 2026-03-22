@@ -1,5 +1,9 @@
 import * as THREE from 'three';
 import { MAT, mk } from './materials.js';
+import { getMg7MuzzleAnchors } from '../../shared/mg7-geometry.js';
+import { RENDERING_CONFIG } from '../../../config/rendering.js';
+
+const TWR = RENDERING_CONFIG.tower;
 
 function buildMg7Mesh(definition, level) {
   const stats = definition.levels[level];
@@ -87,7 +91,7 @@ function buildMg7Mesh(definition, level) {
 
   const barrelPivot = new THREE.Group();
   barrelPivot.position.set(0, 0.125 * s, 0.11 * s);
-  barrelPivot.rotation.x = -0.28;
+  barrelPivot.rotation.x = TWR.animation.idlePitch;
   turret.add(barrelPivot);
 
   const trunnionLeft = mk(new THREE.CylinderGeometry(0.015 * s, 0.015 * s, 0.05 * s, 10), MAT.gunMetalMid);
@@ -102,6 +106,7 @@ function buildMg7Mesh(definition, level) {
 
   const barrelGroup = new THREE.Group();
   const barrelData = [];
+  const muzzleAnchors = [];
   const bRadius = 0.012 * s;
 
   const mantletOuter = mk(new THREE.CylinderGeometry(0.055 * s, 0.068 * s, 0.08 * s, 18), MAT.gunMetalMid);
@@ -117,12 +122,8 @@ function buildMg7Mesh(definition, level) {
 
   if (level < definition.levels.length - 1) {
     const numBarrels = level + 1;
-    const spacing = 0.042 * s;
-    let positions = [];
-    if (numBarrels === 1) positions = [[0, 0]];
-    else if (numBarrels === 2) positions = [[-spacing * 0.55, 0], [spacing * 0.55, 0]];
-    else if (numBarrels === 3) positions = [[0, spacing * 0.5], [-spacing * 0.62, -spacing * 0.34], [spacing * 0.62, -spacing * 0.34]];
-    else positions = [[-spacing * 0.55, spacing * 0.45], [spacing * 0.55, spacing * 0.45], [-spacing * 0.55, -spacing * 0.45], [spacing * 0.55, -spacing * 0.45]];
+    const anchors = getMg7MuzzleAnchors(level, stats.scale);
+    const positions = anchors.map((anchor) => [anchor.x, anchor.y]);
 
     const cradle = mk(new THREE.BoxGeometry((0.09 + numBarrels * 0.03) * s, (0.055 + numBarrels * 0.015) * s, 0.06 * s), MAT.turretMetalDark);
     cradle.position.z = -0.005 * s;
@@ -158,6 +159,11 @@ function buildMg7Mesh(definition, level) {
       barrelGroup.add(muzzle);
 
       barrelData.push({ ox: bx, oy: by, tipZ: barrelLen + 0.06 * s });
+      const muzzleAnchor = new THREE.Object3D();
+      const anchor = anchors[barrelData.length - 1];
+      muzzleAnchor.position.set(anchor.x, anchor.y, anchor.z);
+      barrelGroup.add(muzzleAnchor);
+      muzzleAnchors.push(muzzleAnchor);
     }
   } else {
     const gatCircle = 0.043 * s;
@@ -177,6 +183,7 @@ function buildMg7Mesh(definition, level) {
     spindle.position.z = gatLen / 2;
     gatGroup.add(spindle);
 
+    const anchors = getMg7MuzzleAnchors(level, stats.scale);
     for (let i = 0; i < 6; i++) {
       const angle = (i / 6) * Math.PI * 2;
       const bx = Math.cos(angle) * gatCircle;
@@ -192,6 +199,11 @@ function buildMg7Mesh(definition, level) {
       muzzle.position.set(bx, by, gatLen + 0.01 * s);
       gatGroup.add(muzzle);
       barrelData.push({ ox: bx, oy: by, tipZ: gatLen + 0.02 * s });
+      const muzzleAnchor = new THREE.Object3D();
+      const anchor = anchors[i];
+      muzzleAnchor.position.set(anchor.x, anchor.y, anchor.z);
+      gatGroup.add(muzzleAnchor);
+      muzzleAnchors.push(muzzleAnchor);
     }
 
     for (let index = 0; index < 3; index++) {
@@ -205,12 +217,13 @@ function buildMg7Mesh(definition, level) {
     barrelGroup.add(gatGroup);
   }
 
-  const muzzleFlashMaterial = new THREE.MeshBasicMaterial({ color: 0xffd37a, transparent: true, opacity: 0 });
+  const mf = TWR.muzzleFlash;
+  const muzzleFlashMaterial = new THREE.MeshBasicMaterial({ color: mf.color, transparent: true, opacity: 0 });
   const muzzleFlashes = [];
   for (const tip of barrelData) {
-    const flash = mk(new THREE.SphereGeometry(0.028 * s, 10, 10), muzzleFlashMaterial.clone());
+    const flash = mk(new THREE.SphereGeometry(mf.radius * s, mf.segments, mf.segments), muzzleFlashMaterial.clone());
     flash.position.set(tip.ox, tip.oy, tip.tipZ);
-    flash.scale.set(0.55, 0.55, 1.15);
+    flash.scale.set(mf.scale.x, mf.scale.y, mf.scale.z);
     flash.visible = false;
     barrelGroup.add(flash);
     muzzleFlashes.push(flash);
@@ -219,30 +232,32 @@ function buildMg7Mesh(definition, level) {
   barrelPivot.add(barrelGroup);
   turret.userData.barrelData = barrelData;
   turret.userData.barrelPivot = barrelPivot;
+  turret.userData.muzzleAnchors = muzzleAnchors;
   turret.userData.muzzleFlashes = muzzleFlashes;
 
+  const ind = TWR.indicator;
   const topIndicator = mk(
-    new THREE.BoxGeometry(0.022 * s, 0.015 * s, 0.022 * s),
-    new THREE.MeshStandardMaterial({ color: 0x9be56f, emissive: 0x63d144, emissiveIntensity: 0.7, metalness: 0.4, roughness: 0.35 }),
+    new THREE.BoxGeometry(ind.top.size * s, ind.top.height * s, ind.top.size * s),
+    new THREE.MeshStandardMaterial({ color: ind.top.color, emissive: ind.top.emissive, emissiveIntensity: ind.top.emissiveIntensity, metalness: ind.top.metalness, roughness: ind.top.roughness }),
   );
-  topIndicator.position.set(0.02 * s, 0.27 * s, 0.02 * s);
+  topIndicator.position.set(ind.top.position.x * s, ind.top.position.y * s, ind.top.position.z * s);
   turret.add(topIndicator);
 
   const sideIndicator = mk(
-    new THREE.BoxGeometry(0.018 * s, 0.018 * s, 0.018 * s),
-    new THREE.MeshStandardMaterial({ color: 0x8ce96a, emissive: 0x59ce43, emissiveIntensity: 0.6, metalness: 0.35, roughness: 0.32 }),
+    new THREE.BoxGeometry(ind.side.size * s, ind.side.size * s, ind.side.size * s),
+    new THREE.MeshStandardMaterial({ color: ind.side.color, emissive: ind.side.emissive, emissiveIntensity: ind.side.emissiveIntensity, metalness: ind.side.metalness, roughness: ind.side.roughness }),
   );
-  sideIndicator.position.set(0.095 * s, 0.03 * s, 0.12 * s);
+  sideIndicator.position.set(ind.side.position.x * s, ind.side.position.y * s, ind.side.position.z * s);
   turret.add(sideIndicator);
   turret.userData.led = sideIndicator;
 
-  const levelColors = [0x44ff44, 0x66ff44, 0xffff44, 0xffaa22, 0xff4444];
+  const ld = ind.levelDot;
   for (let index = 0; index <= level; index++) {
     const dot = mk(
-      new THREE.SphereGeometry(0.005 * s, 4, 4),
-      new THREE.MeshStandardMaterial({ color: levelColors[index], emissive: levelColors[index], emissiveIntensity: 0.5 }),
+      new THREE.SphereGeometry(ld.radius * s, ld.segments, ld.segments),
+      new THREE.MeshStandardMaterial({ color: TWR.levelColors[index], emissive: TWR.levelColors[index], emissiveIntensity: ld.emissiveIntensity }),
     );
-    dot.position.set(-0.14 * s, 0.03 * s + index * 0.026 * s, 0.095 * s);
+    dot.position.set(ld.position.x * s, ld.position.y * s + index * ld.spacing * s, ld.position.z * s);
     turret.add(dot);
   }
 
@@ -252,14 +267,17 @@ function buildMg7Mesh(definition, level) {
 }
 
 export class TowerRenderer {
-  constructor(scene, towerDefinitions) {
+  constructor(scene, towerDefinitions, worldScale = 1) {
     this.scene = scene;
     this.towerDefinitions = towerDefinitions;
+    this.worldScale = worldScale;
     this.meshes = new Map();
   }
 
   buildMesh(towerTypeId, level) {
-    return buildMg7Mesh(this.towerDefinitions[towerTypeId], level);
+    const mesh = buildMg7Mesh(this.towerDefinitions[towerTypeId], level);
+    mesh.scale.setScalar(this.worldScale);
+    return mesh;
   }
 
   sync(state, elapsedTime) {
@@ -271,6 +289,7 @@ export class TowerRenderer {
       }
     }
 
+    const anim = TWR.animation;
     for (const tower of state.towers) {
       let entry = this.meshes.get(tower.id);
       if (!entry || entry.level !== tower.level) {
@@ -286,18 +305,35 @@ export class TowerRenderer {
       const turret = entry.mesh.userData.turret;
       turret.rotation.y = tower.aimAngle;
       if (turret.userData.barrelPivot) {
-        turret.userData.barrelPivot.rotation.x = tower.hasTarget ? -0.22 : -0.28;
+        turret.userData.barrelPivot.rotation.x = tower.hasTarget ? tower.aimPitch : anim.idlePitch;
       }
       if (tower.level === 4 && turret.userData.gatlingGroup) {
-        turret.userData.gatlingGroup.rotation.z += tower.hasTarget ? 0.75 : 0.03;
+        turret.userData.gatlingGroup.rotation.z += tower.hasTarget ? anim.gatlingSpeedActive : anim.gatlingSpeedIdle;
       }
       if (turret.userData.led) {
-        turret.userData.led.material.emissiveIntensity = 0.3 + Math.sin(elapsedTime * 3) * 0.3;
+        turret.userData.led.material.emissiveIntensity = anim.ledPulse.base + Math.sin(elapsedTime * anim.ledPulse.frequency) * anim.ledPulse.amplitude;
       }
     }
   }
 
   getTurret(towerId) {
     return this.meshes.get(towerId)?.mesh.userData.turret ?? null;
+  }
+
+  getMuzzleWorldPosition(towerId, fireIndex = 0, forwardOffset = 0) {
+    const turret = this.getTurret(towerId);
+    const muzzleAnchors = turret?.userData.muzzleAnchors ?? [];
+    if (muzzleAnchors.length === 0) return null;
+    const anchor = muzzleAnchors[fireIndex % muzzleAnchors.length];
+    const worldPosition = new THREE.Vector3();
+    anchor.getWorldPosition(worldPosition);
+    if (forwardOffset !== 0) {
+      const worldQuaternion = new THREE.Quaternion();
+      const forward = new THREE.Vector3(0, 0, 1);
+      anchor.getWorldQuaternion(worldQuaternion);
+      forward.applyQuaternion(worldQuaternion).normalize().multiplyScalar(forwardOffset);
+      worldPosition.add(forward);
+    }
+    return worldPosition;
   }
 }

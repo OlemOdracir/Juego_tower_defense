@@ -1,60 +1,231 @@
 import * as THREE from 'three';
+import { FRAMING_CONFIG } from '../../config/framing.js';
 
-export function createSceneRuntime(viewportEl, mapDefinition) {
+function applyCameraPose(camera, angle, elevation, distance, worldScale, target) {
+  camera.position.set(
+    Math.cos(angle) * Math.cos(elevation) * distance * worldScale,
+    Math.sin(elevation) * distance * worldScale,
+    Math.sin(angle) * Math.cos(elevation) * distance * worldScale,
+  );
+  camera.lookAt(target);
+  camera.updateMatrixWorld(true);
+}
+
+function getPlayableHalfExtents(mapDefinition, worldScale, framingConfig) {
+  const padding = framingConfig.fitPlayablePadding ?? 0;
+  return {
+    halfWidth: ((mapDefinition.width + padding) * worldScale) / 2,
+    halfDepth: ((mapDefinition.height + padding) * worldScale) / 2,
+  };
+}
+
+function getPlayableCorners(mapDefinition, worldScale, framingConfig) {
+  const { halfWidth, halfDepth } = getPlayableHalfExtents(mapDefinition, worldScale, framingConfig);
+  return [
+    new THREE.Vector3(-halfWidth, 0, -halfDepth),
+    new THREE.Vector3(-halfWidth, 0, halfDepth),
+    new THREE.Vector3(halfWidth, 0, -halfDepth),
+    new THREE.Vector3(halfWidth, 0, halfDepth),
+  ];
+}
+
+function getFitCamSize(camera, mapDefinition, worldScale, aspect, target, framingConfig) {
+  const corners = getPlayableCorners(mapDefinition, worldScale, framingConfig);
+
+  let minX = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+
+  for (const corner of corners) {
+    const local = corner.clone().sub(target).applyQuaternion(camera.quaternion.clone().invert());
+    minX = Math.min(minX, local.x);
+    maxX = Math.max(maxX, local.x);
+    minY = Math.min(minY, local.y);
+    maxY = Math.max(maxY, local.y);
+  }
+
+  const requiredHalfHeight = Math.max((maxY - minY) / 2, (maxX - minX) / (2 * aspect));
+  return requiredHalfHeight * framingConfig.fitPadding;
+}
+
+function projectPointToViewport(camera, point, viewportRect) {
+  const ndc = point.clone().project(camera);
+  return {
+    x: ((ndc.x + 1) / 2) * viewportRect.width,
+    y: ((1 - ndc.y) / 2) * viewportRect.height,
+  };
+}
+
+function computeProjectedPlayableBounds(camera, mapDefinition, worldScale, framingConfig, viewportRect) {
+  const points = getPlayableCorners(mapDefinition, worldScale, framingConfig).map((corner) =>
+    projectPointToViewport(camera, corner, viewportRect),
+  );
+
+  const minX = Math.min(...points.map((point) => point.x));
+  const maxX = Math.max(...points.map((point) => point.x));
+  const minY = Math.min(...points.map((point) => point.y));
+  const maxY = Math.max(...points.map((point) => point.y));
+
+  return {
+    minX,
+    maxX,
+    minY,
+    maxY,
+    width: maxX - minX,
+    height: maxY - minY,
+    points,
+  };
+}
+
+function screenToGround(camera, viewportRect, raycaster, plane, screenX, screenY) {
+  const ndcX = (screenX / viewportRect.width) * 2 - 1;
+  const ndcY = 1 - (screenY / viewportRect.height) * 2;
+  raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera);
+  const hit = new THREE.Vector3();
+  if (!raycaster.ray.intersectPlane(plane, hit)) return null;
+  return hit;
+}
+
+function recenterTargetToViewport({
+  camera,
+  mapDefinition,
+  worldScale,
+  framingConfig,
+  viewportRect,
+  target,
+  raycaster,
+  plane,
+}) {
+  const centering = framingConfig.centering ?? {};
+  const bounds = computeProjectedPlayableBounds(camera, mapDefinition, worldScale, framingConfig, viewportRect);
+  const centerX = (bounds.minX + bounds.maxX) / 2;
+  const centerY = (bounds.minY + bounds.maxY) / 2;
+  const desiredX = viewportRect.width * (centering.screenXRatio ?? 0.5);
+  const desiredY = viewportRect.height * (centering.screenYRatio ?? 0.5);
+  const tolerance = centering.tolerancePx ?? 0.5;
+
+  if (Math.abs(centerX - desiredX) <= tolerance && Math.abs(centerY - desiredY) <= tolerance) {
+    return false;
+  }
+
+  const currentWorld = screenToGround(camera, viewportRect, raycaster, plane, centerX, centerY);
+  const desiredWorld = screenToGround(camera, viewportRect, raycaster, plane, desiredX, desiredY);
+  if (!currentWorld || !desiredWorld) return false;
+
+  target.x += currentWorld.x - desiredWorld.x;
+  target.z += currentWorld.z - desiredWorld.z;
+  return true;
+}
+
+export function createSceneRuntime({
+  viewportEl,
+  mapDefinition,
+  worldScale = 1,
+  framingConfig = FRAMING_CONFIG,
+}) {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(mapDefinition.visualModel.skyColor);
-  scene.fog = new THREE.FogExp2(mapDefinition.visualModel.skyColor, mapDefinition.visualModel.fogDensity);
+  scene.fog = new THREE.FogExp2(mapDefinition.visualModel.skyColor, mapDefinition.visualModel.fogDensity / worldScale);
 
-  let camSize = 8.6;
-  let cameraAngle = Math.PI / 4;
-  const cameraElevation = Math.atan(1 / Math.sqrt(2));
+  let cameraAngle = framingConfig.initialAngle;
+  const cameraElevation = framingConfig.elevation;
+  const target = new THREE.Vector3(
+    (framingConfig.lookAtXOffset ?? 0) * worldScale,
+    0,
+    (framingConfig.lookAtZOffset ?? 0) * worldScale,
+  );
+  let fitCamSize = framingConfig.initialSize * worldScale;
+  let zoomRatio = framingConfig.zoom.defaultRatio ?? 1;
+  let hasInitializedZoom = false;
+  let camSize = fitCamSize * zoomRatio;
 
-  const camera = new THREE.OrthographicCamera(-1, 1, camSize, -camSize, 0.1, 200);
+  const camera = new THREE.OrthographicCamera(-1, 1, camSize, -camSize, 0.1, framingConfig.farPlane * worldScale);
   const renderer = new THREE.WebGLRenderer({ antialias: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, framingConfig.maxPixelRatio));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   viewportEl.insertBefore(renderer.domElement, viewportEl.firstChild);
+  const recenterRaycaster = new THREE.Raycaster();
+  const recenterPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 
-  scene.add(new THREE.AmbientLight(0x99aabb, 0.45));
-  const sunLight = new THREE.DirectionalLight(0xfff0d0, 0.9);
-  sunLight.position.set(10, 18, 8);
+  const { lighting } = framingConfig;
+  scene.add(new THREE.AmbientLight(lighting.ambient.color, lighting.ambient.intensity));
+  const sunLight = new THREE.DirectionalLight(lighting.sun.color, lighting.sun.intensity);
+  sunLight.position.set(
+    lighting.sun.position[0] * worldScale,
+    lighting.sun.position[1] * worldScale,
+    lighting.sun.position[2] * worldScale,
+  );
   sunLight.castShadow = true;
-  sunLight.shadow.camera.left = -14;
-  sunLight.shadow.camera.right = 14;
-  sunLight.shadow.camera.top = 14;
-  sunLight.shadow.camera.bottom = -14;
-  sunLight.shadow.mapSize.set(1024, 1024);
+  sunLight.shadow.camera.left = -lighting.sun.shadowBounds * worldScale;
+  sunLight.shadow.camera.right = lighting.sun.shadowBounds * worldScale;
+  sunLight.shadow.camera.top = lighting.sun.shadowBounds * worldScale;
+  sunLight.shadow.camera.bottom = -lighting.sun.shadowBounds * worldScale;
+  sunLight.shadow.mapSize.set(lighting.sun.shadowMapSize, lighting.sun.shadowMapSize);
   scene.add(sunLight);
-  const fillLight = new THREE.DirectionalLight(0xaaccff, 0.25);
-  fillLight.position.set(-8, 10, -6);
+
+  const fillLight = new THREE.DirectionalLight(lighting.fill.color, lighting.fill.intensity);
+  fillLight.position.set(
+    lighting.fill.position[0] * worldScale,
+    lighting.fill.position[1] * worldScale,
+    lighting.fill.position[2] * worldScale,
+  );
   scene.add(fillLight);
 
   function resize() {
     const rect = viewportEl.getBoundingClientRect();
     const aspect = rect.width / rect.height;
+
+    applyCameraPose(camera, cameraAngle, cameraElevation, framingConfig.distance, worldScale, target);
+    const fitSize = getFitCamSize(camera, mapDefinition, worldScale, aspect, target, framingConfig);
+    if (Number.isFinite(fitSize) && fitSize > 0) {
+      fitCamSize = fitSize;
+    }
+    if (!hasInitializedZoom) {
+      zoomRatio = (framingConfig.zoom.defaultRatio ?? 1) + (framingConfig.initialZoomRatio ?? 0);
+      hasInitializedZoom = true;
+    }
+    zoomRatio = Math.max(
+      framingConfig.zoom.minRatio,
+      Math.min(framingConfig.zoom.maxRatio, zoomRatio),
+    );
+    camSize = fitCamSize * zoomRatio;
+
     camera.left = -camSize * aspect;
     camera.right = camSize * aspect;
     camera.top = camSize;
     camera.bottom = -camSize;
-    camera.position.set(
-      Math.cos(cameraAngle) * Math.cos(cameraElevation) * 40,
-      Math.sin(cameraElevation) * 40,
-      Math.sin(cameraAngle) * Math.cos(cameraElevation) * 40,
-    );
-    camera.lookAt(0, 0, -2.4);
     camera.updateProjectionMatrix();
     renderer.setSize(rect.width, rect.height);
+
+    if (recenterTargetToViewport({
+      camera,
+      mapDefinition,
+      worldScale,
+      framingConfig,
+      viewportRect: rect,
+      target,
+      raycaster: recenterRaycaster,
+      plane: recenterPlane,
+    })) {
+      applyCameraPose(camera, cameraAngle, cameraElevation, framingConfig.distance, worldScale, target);
+    }
   }
 
   function rotate(deltaX) {
-    cameraAngle += deltaX * 0.006;
+    cameraAngle += deltaX * framingConfig.rotation.sensitivity;
     resize();
   }
 
   function zoom(deltaY) {
-    camSize = Math.max(4.2, Math.min(13.5, camSize + deltaY * 0.004));
+    zoomRatio += deltaY * framingConfig.zoom.sensitivity;
     resize();
+  }
+
+  function getProjectedPlayableBounds() {
+    const viewportRect = viewportEl.getBoundingClientRect();
+    return computeProjectedPlayableBounds(camera, mapDefinition, worldScale, framingConfig, viewportRect);
   }
 
   resize();
@@ -66,8 +237,17 @@ export function createSceneRuntime(viewportEl, mapDefinition) {
     resize,
     rotate,
     zoom,
+    getProjectedPlayableBounds,
     get cameraAngle() {
       return cameraAngle;
+    },
+    get framing() {
+      return {
+        fitCamSize,
+        zoomRatio,
+        camSize,
+        target: target.clone(),
+      };
     },
   };
 }

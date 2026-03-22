@@ -1,4 +1,5 @@
 export { createGameConfig } from './config.js';
+export { gridToWorld, worldToGrid } from './coordinates.js';
 export {
   cloneStateValue,
   consumeEffects,
