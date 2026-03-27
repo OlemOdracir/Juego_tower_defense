@@ -8,8 +8,79 @@ const SHARED_HUMVEE_VISUAL = {
     y: Math.PI,
     z: 0,
   },
-  headingOffset: Math.PI,
+  headingOffset: 0,
   assetNodeMap: null,
+};
+
+const SHARED_HUMVEE_GUNNER_VISUAL = {
+  renderer: 'asset-vehicle',
+  assetPath: 'assets/models/vehicles/humvee_armed_v1.glb',
+  assetRotation: {
+    x: Math.PI / 2,
+    y: Math.PI,
+    z: 0,
+  },
+  headingOffset: 0,
+  yawPivotMode: 'chassis',
+  pitchPivotFromMuzzle: 0.08,
+  pitchAxis: 'x',
+  pitchSign: -1,
+  pitchMin: -0.15,
+  pitchMax: 0.35,
+  assetNodeMap: {
+    turretYaw: 'vehicle_turret_yaw',
+    gunPitch: 'vehicle_gun_pitch',
+    muzzleNames: ['armed_muzzle_cap_01'],
+  },
+  skipWeaponNodeValidation: true,
+};
+
+const SHARED_HUMVEE_A331_VISUAL = {
+  renderer: 'asset-vehicle',
+  assetPath: 'assets/models/vehicles/humvee_a331_turret.glb',
+  assetRotation: {
+    x: 0,
+    y: Math.PI / 2,
+    z: 0,
+  },
+  headingOffset: 0,
+  autoHeadingFromMuzzle: true,
+  headingOffsetAdjust: Math.PI,
+  assetNodeMap: {
+    turretYaw: 'Turret',
+    gunPitch: 'Gun',
+    muzzleNames: ['a331_muzzle_01', 'a331_muzzle_02'],
+  },
+  skipWeaponNodeValidation: true,
+};
+
+const SHARED_M163_VADS_VISUAL = {
+  renderer: 'asset-vehicle',
+  assetPath: 'assets/models/vehicles/m163a2_vads.glb',
+  assetRotation: {
+    x: 0,
+    y: 0,
+    z: 0,
+  },
+  headingOffset: 0,
+  autoHeadingFromMuzzle: true,
+  headingOffsetAdjust: 0,
+  yawPivotMode: 'chassis',
+  turretYawOffset: -Math.PI / 2,
+  pitchPivotFromMuzzle: 0.72,
+  pitchAxis: 'x',
+  pitchSign: -1,
+  pitchMin: -0.22,
+  pitchMax: 0.18,
+  assetNodeMap: {
+    turretYaw: 'turret',
+    gunPitch: 'mount',
+    muzzleNames: ['m163_muzzle_01'],
+  },
+  skipWeaponNodeValidation: true,
+  wheelNodePrefix: 'wheel',
+  wheelSpinAxis: 'x',
+  wheelSpinRate: 8,
 };
 
 function createVehicleDefinition({
@@ -23,8 +94,18 @@ function createVehicleDefinition({
   threatTier,
   damageType,
   role,
+  weaponProfile = null,
+  firingArc = null,
+  hitRadius = null,
+  weaponKit = null,
+  visualPreset = 'base',
   assetScale = 1,
+  spawnIntervalSeconds = null,
 }) {
+  let sharedVisual = SHARED_HUMVEE_VISUAL;
+  if (visualPreset === 'gunner') sharedVisual = SHARED_HUMVEE_GUNNER_VISUAL;
+  if (visualPreset === 'a331') sharedVisual = SHARED_HUMVEE_A331_VISUAL;
+  if (visualPreset === 'm163vads') sharedVisual = SHARED_M163_VADS_VISUAL;
   return {
     id,
     displayName,
@@ -41,17 +122,24 @@ function createVehicleDefinition({
     },
     combatModel: {
       damageType,
+      weaponProfile: weaponProfile
+        ? { ...weaponProfile, firingArc: firingArc ?? weaponProfile.firingArc ?? Math.PI * 2 }
+        : null,
+      isArmed: Boolean(weaponProfile),
+      hitRadius,
     },
     visualModel: {
-      ...SHARED_HUMVEE_VISUAL,
+      ...sharedVisual,
       assetScale,
+      weaponKit,
     },
+    spawnIntervalSeconds,
   };
 }
 
 export const vehicleEnemyDefinitions = {
-  'scout-buggy': createVehicleDefinition({
-    id: 'scout-buggy',
+  'scout-buggy-unarmed': createVehicleDefinition({
+    id: 'scout-buggy-unarmed',
     displayName: 'Scout Buggy',
     armorClass: 'light',
     hp: 42,
@@ -61,10 +149,10 @@ export const vehicleEnemyDefinitions = {
     threatTier: 1,
     damageType: MUNITION_CLASSES.lightBallistic,
     role: 'recon',
-    assetScale: 0.94,
+    assetScale: 0.2,
   }),
-  'humvee-gunner': createVehicleDefinition({
-    id: 'humvee-gunner',
+  'humvee-gunner-unarmed': createVehicleDefinition({
+    id: 'humvee-gunner-unarmed',
     displayName: 'Humvee Gunner',
     armorClass: 'light',
     hp: 56,
@@ -74,7 +162,57 @@ export const vehicleEnemyDefinitions = {
     threatTier: 1,
     damageType: MUNITION_CLASSES.lightBallistic,
     role: 'gunner',
-    assetScale: 1,
+    assetScale: 0.22,
+  }),
+  'scout-buggy-mg': createVehicleDefinition({
+    id: 'scout-buggy-mg',
+    displayName: 'Scout Buggy MG',
+    armorClass: 'light',
+    hp: 46,
+    armor: 2,
+    speed: 1.95,
+    reward: 14,
+    threatTier: 1,
+    damageType: MUNITION_CLASSES.lightBallistic,
+    role: 'recon-armed',
+    visualPreset: 'gunner',
+    assetScale: 0.2,
+    weaponProfile: {
+      damage: 4.2,
+      rate: 1.7,
+      range: 3.1,
+      projectileSpeed: 24.5,
+      hitThreshold: 0.17,
+      damageType: MUNITION_CLASSES.lightBallistic,
+      muzzleHeight: 0.2,
+      muzzleForward: 0.36,
+      yawSpeed: Math.PI * 1.5,  // 270°/s — torreta ligera, ágil
+    },
+  }),
+  'humvee-gunner-mg': createVehicleDefinition({
+    id: 'humvee-gunner-mg',
+    displayName: 'Humvee Gunner MG',
+    armorClass: 'light',
+    hp: 62,
+    armor: 3,
+    speed: 1.75,
+    reward: 18,
+    threatTier: 1,
+    damageType: MUNITION_CLASSES.lightBallistic,
+    role: 'gunner-armed',
+    visualPreset: 'gunner',
+    assetScale: 0.22,
+    weaponProfile: {
+      damage: 5.2,
+      rate: 1.55,
+      range: 3.2,
+      projectileSpeed: 25.5,
+      hitThreshold: 0.18,
+      damageType: MUNITION_CLASSES.lightBallistic,
+      muzzleHeight: 0.23,
+      muzzleForward: 0.39,
+      yawSpeed: Math.PI * 1.5,  // 270°/s — torreta ligera, ágil
+    },
   }),
   'missile-truck': createVehicleDefinition({
     id: 'missile-truck',
@@ -87,7 +225,19 @@ export const vehicleEnemyDefinitions = {
     threatTier: 2,
     damageType: MUNITION_CLASSES.shapedCharge,
     role: 'missile',
-    assetScale: 1.02,
+    visualPreset: 'gunner',
+    assetScale: 0.23,
+    weaponProfile: {
+      damage: 12.5,
+      rate: 0.62,
+      range: 3.6,
+      projectileSpeed: 24.2,
+      hitThreshold: 0.22,
+      damageType: MUNITION_CLASSES.shapedCharge,
+      muzzleHeight: 0.26,
+      muzzleForward: 0.4,
+      yawSpeed: Math.PI / 2,  // 90°/s — lanzamisiles pesado, lento para apuntar
+    },
   }),
   'apc-autocannon': createVehicleDefinition({
     id: 'apc-autocannon',
@@ -100,7 +250,19 @@ export const vehicleEnemyDefinitions = {
     threatTier: 2,
     damageType: MUNITION_CLASSES.heavyBallistic,
     role: 'apc',
-    assetScale: 1.08,
+    visualPreset: 'gunner',
+    assetScale: 0.24,
+    weaponProfile: {
+      damage: 10.8,
+      rate: 0.9,
+      range: 3.4,
+      projectileSpeed: 24.8,
+      hitThreshold: 0.22,
+      damageType: MUNITION_CLASSES.heavyBallistic,
+      muzzleHeight: 0.27,
+      muzzleForward: 0.42,
+      yawSpeed: Math.PI,  // 180°/s — torreta media
+    },
   }),
   'ifv-missile': createVehicleDefinition({
     id: 'ifv-missile',
@@ -113,7 +275,46 @@ export const vehicleEnemyDefinitions = {
     threatTier: 2,
     damageType: MUNITION_CLASSES.shapedCharge,
     role: 'ifv',
-    assetScale: 1.1,
+    visualPreset: 'gunner',
+    assetScale: 0.25,
+    weaponProfile: {
+      damage: 14.8,
+      rate: 0.54,
+      range: 3.8,
+      projectileSpeed: 23.9,
+      hitThreshold: 0.24,
+      damageType: MUNITION_CLASSES.shapedCharge,
+      muzzleHeight: 0.27,
+      muzzleForward: 0.42,
+      yawSpeed: Math.PI * 0.6,  // 108°/s — lanzador IFV, deliberado
+    },
+  }),
+  'm163-vads-medium': createVehicleDefinition({
+    id: 'm163-vads-medium',
+    displayName: 'M163A2 VADS',
+    armorClass: 'medium',
+    hp: 148,
+    armor: 9,
+    speed: 0.66,
+    reward: 38,
+    threatTier: 2,
+    damageType: MUNITION_CLASSES.heavyBallistic,
+    role: 'spaa',
+    visualPreset: 'm163vads',
+    assetScale: 0.11,
+    hitRadius: 0.09,
+    spawnIntervalSeconds: 3,
+    weaponProfile: {
+      damage: 6.4,
+      rate: 2.15,
+      range: 3.5,
+      projectileSpeed: 23.5,
+      hitThreshold: 0.2,
+      damageType: MUNITION_CLASSES.heavyBallistic,
+      muzzleHeight: 0.25,
+      muzzleForward: 0.34,
+      yawSpeed: Math.PI * 2,  // 360°/s — antiaéreo, diseñado para seguir blancos rápidos
+    },
   }),
   'siege-tank': createVehicleDefinition({
     id: 'siege-tank',
@@ -126,12 +327,58 @@ export const vehicleEnemyDefinitions = {
     threatTier: 3,
     damageType: MUNITION_CLASSES.piercing,
     role: 'heavy',
-    assetScale: 1.18,
+    visualPreset: 'gunner',
+    assetScale: 0.28,
+    weaponProfile: {
+      damage: 22.5,
+      rate: 0.38,
+      range: 4.1,
+      projectileSpeed: 23.1,
+      hitThreshold: 0.26,
+      damageType: MUNITION_CLASSES.piercing,
+      muzzleHeight: 0.31,
+      muzzleForward: 0.48,
+      yawSpeed: Math.PI / 3,  // 60°/s — torreta de tanque pesado, muy lenta
+    },
+  }),
+  'humvee-a331-mg': createVehicleDefinition({
+    id: 'humvee-a331-mg',
+    displayName: 'Humvee A331 MG (Lab)',
+    armorClass: 'light',
+    hp: 62,
+    armor: 3,
+    speed: 1.75,
+    reward: 18,
+    threatTier: 1,
+    damageType: MUNITION_CLASSES.lightBallistic,
+    role: 'gunner-lab',
+    visualPreset: 'a331',
+    assetScale: 0.22,
+    weaponProfile: {
+      damage: 5.2,
+      rate: 1.55,
+      range: 3.2,
+      projectileSpeed: 25.5,
+      hitThreshold: 0.18,
+      damageType: MUNITION_CLASSES.lightBallistic,
+      muzzleHeight: 0.23,
+      muzzleForward: 0.39,
+      yawSpeed: Math.PI,  // 180°/s — torreta A331 media
+    },
   }),
 };
 
 export const vehiclePoolsByTier = {
-  1: ['scout-buggy', 'humvee-gunner'],
-  2: ['missile-truck', 'apc-autocannon', 'ifv-missile'],
-  3: ['siege-tank'],
+  1: {
+    unarmed: ['scout-buggy-unarmed', 'humvee-gunner-unarmed'],
+    armed: ['scout-buggy-mg', 'humvee-gunner-mg', 'humvee-a331-mg'],
+  },
+  2: {
+    unarmed: [],
+    armed: ['missile-truck', 'apc-autocannon', 'ifv-missile', 'm163-vads-medium'],
+  },
+  3: {
+    unarmed: [],
+    armed: ['siege-tank'],
+  },
 };
