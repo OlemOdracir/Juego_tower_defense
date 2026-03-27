@@ -10,6 +10,10 @@ export const EFFECTS_CONFIG = {
       zOffset: -0.04,
     },
   },
+  enemyProjectile: {
+    sphereColor: 0xff3636,
+    trailColor: 0xd11b1b,
+  },
 
   muzzleFlash: {
     forwardOffset: 0.018,
@@ -17,6 +21,13 @@ export const EFFECTS_CONFIG = {
     segments: 4,
     color: 0xffffaa,
     lifetime: 0.035,
+  },
+  enemyMuzzleFlash: {
+    forwardOffset: 0.028,
+    radius: 0.048,
+    segments: 8,
+    color: 0xff6c4d,
+    lifetime: 0.085,
   },
 
   hitSpark: {
@@ -26,6 +37,14 @@ export const EFFECTS_CONFIG = {
     opacity: 0.82,
     lifetime: 0.08,
     growthRate: 18,
+  },
+  towerHitSpark: {
+    radius: 0.03,
+    segments: 8,
+    color: 0xffa35c,
+    opacity: 0.86,
+    lifetime: 0.1,
+    growthRate: 14,
   },
 
   explosionFlipbook: {
@@ -107,6 +126,15 @@ export const EFFECTS_CONFIG = {
     yOffset: 0.08,
     lifetime: 0.16,
     growthRate: 10,
+  },
+  towerDestroyedBurst: {
+    radius: 0.16,
+    segments: 12,
+    color: 0xff7b39,
+    opacity: 0.9,
+    yOffset: 0.12,
+    lifetime: 0.22,
+    growthRate: 8.5,
   },
 
   debris: {

@@ -13,7 +13,7 @@ export class HudPresenter {
   }
 
   render(state) {
-    this.creditsEl.textContent = state.credits;
+    this.creditsEl.textContent = Number.isFinite(state.credits) ? `${Math.floor(state.credits)}` : '∞';
     this.waveEl.textContent = state.wave;
     this.enemyCountEl.textContent = state.enemies.length;
 
@@ -31,14 +31,19 @@ export class HudPresenter {
       this.waveButtonEl.classList.remove('wave-active');
     } else {
       this.waveButtonEl.disabled = false;
-      this.waveButtonEl.textContent = `▶ Oleada ${state.wave + 1}`;
+      this.waveButtonEl.textContent = `> Oleada ${state.wave + 1}`;
       this.waveButtonEl.classList.remove('wave-active');
     }
 
     if (this.tipEl) {
-      this.tipEl.textContent = state.waveActive
-        ? 'Oleada activa · Destruye los vehículos antes de que lleguen a la base'
-        : 'Click = colocar · Click torre = inspeccionar · Scroll = zoom · Derecho = rotar';
+      const hasWaveLockNotice = Number(state.uiLockNoticeUntil) > Date.now();
+      if (hasWaveLockNotice) {
+        this.tipEl.textContent = 'Oleada activa: construccion, mejora y venta bloqueadas';
+      } else if (state.waveActive) {
+        this.tipEl.textContent = 'Oleada activa: protege la linea frontal y evita que destruyan tus torres';
+      } else {
+        this.tipEl.textContent = 'Click: colocar | Click torre: inspeccionar | Scroll: zoom | Derecho: rotar';
+      }
     }
 
     if (state.overlay.visible) {

@@ -4,6 +4,7 @@ export {
   cloneStateValue,
   consumeEffects,
   createInitialState,
+  createTowerWaveBaseline,
   createWaveSnapshot,
   resetAll,
   resetWave,
@@ -16,4 +17,5 @@ export {
   startWave,
   tickSimulation,
   upgradeTower,
+  upgradeTowerDefense,
 } from './simulation.js';

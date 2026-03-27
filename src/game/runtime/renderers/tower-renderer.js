@@ -125,7 +125,10 @@ function buildMg7Mesh(definition, level) {
     const anchors = getMg7MuzzleAnchors(level, stats.scale);
     const positions = anchors.map((anchor) => [anchor.x, anchor.y]);
 
-    const cradle = mk(new THREE.BoxGeometry((0.09 + numBarrels * 0.03) * s, (0.055 + numBarrels * 0.015) * s, 0.06 * s), MAT.turretMetalDark);
+    const cradle = mk(
+      new THREE.BoxGeometry((0.09 + numBarrels * 0.03) * s, (0.055 + numBarrels * 0.015) * s, 0.06 * s),
+      MAT.turretMetalDark,
+    );
     cradle.position.z = -0.005 * s;
     cradle.castShadow = true;
     barrelGroup.add(cradle);
@@ -238,14 +241,26 @@ function buildMg7Mesh(definition, level) {
   const ind = TWR.indicator;
   const topIndicator = mk(
     new THREE.BoxGeometry(ind.top.size * s, ind.top.height * s, ind.top.size * s),
-    new THREE.MeshStandardMaterial({ color: ind.top.color, emissive: ind.top.emissive, emissiveIntensity: ind.top.emissiveIntensity, metalness: ind.top.metalness, roughness: ind.top.roughness }),
+    new THREE.MeshStandardMaterial({
+      color: ind.top.color,
+      emissive: ind.top.emissive,
+      emissiveIntensity: ind.top.emissiveIntensity,
+      metalness: ind.top.metalness,
+      roughness: ind.top.roughness,
+    }),
   );
   topIndicator.position.set(ind.top.position.x * s, ind.top.position.y * s, ind.top.position.z * s);
   turret.add(topIndicator);
 
   const sideIndicator = mk(
     new THREE.BoxGeometry(ind.side.size * s, ind.side.size * s, ind.side.size * s),
-    new THREE.MeshStandardMaterial({ color: ind.side.color, emissive: ind.side.emissive, emissiveIntensity: ind.side.emissiveIntensity, metalness: ind.side.metalness, roughness: ind.side.roughness }),
+    new THREE.MeshStandardMaterial({
+      color: ind.side.color,
+      emissive: ind.side.emissive,
+      emissiveIntensity: ind.side.emissiveIntensity,
+      metalness: ind.side.metalness,
+      roughness: ind.side.roughness,
+    }),
   );
   sideIndicator.position.set(ind.side.position.x * s, ind.side.position.y * s, ind.side.position.z * s);
   turret.add(sideIndicator);
@@ -255,7 +270,11 @@ function buildMg7Mesh(definition, level) {
   for (let index = 0; index <= level; index++) {
     const dot = mk(
       new THREE.SphereGeometry(ld.radius * s, ld.segments, ld.segments),
-      new THREE.MeshStandardMaterial({ color: TWR.levelColors[index], emissive: TWR.levelColors[index], emissiveIntensity: ld.emissiveIntensity }),
+      new THREE.MeshStandardMaterial({
+        color: TWR.levelColors[index],
+        emissive: TWR.levelColors[index],
+        emissiveIntensity: ld.emissiveIntensity,
+      }),
     );
     dot.position.set(ld.position.x * s, ld.position.y * s + index * ld.spacing * s, ld.position.z * s);
     turret.add(dot);
@@ -264,6 +283,144 @@ function buildMg7Mesh(definition, level) {
   group.add(turret);
   group.userData.turret = turret;
   return group;
+}
+
+function buildWreckMesh(definition, level) {
+  const stats = definition.levels[level];
+  const s = 0.66 * stats.scale;
+  const wreckCfg = TWR.wreck;
+  const group = new THREE.Group();
+  const wreckMaterial = new THREE.MeshStandardMaterial({
+    color: wreckCfg.metalColor,
+    roughness: 0.88,
+    metalness: 0.24,
+  });
+
+  const base = mk(new THREE.CylinderGeometry(0.31 * s, 0.24 * s, wreckCfg.baseHeight * s, 10), wreckMaterial);
+  base.position.y = wreckCfg.baseHeight * 0.5 * s;
+  base.castShadow = true;
+  group.add(base);
+
+  const brokenBody = mk(new THREE.BoxGeometry(0.27 * s, wreckCfg.blockHeight * s, 0.2 * s), wreckMaterial);
+  brokenBody.position.set(0.02 * s, 0.19 * s, -0.01 * s);
+  brokenBody.rotation.set(0.16, 0.38, -0.08);
+  brokenBody.castShadow = true;
+  group.add(brokenBody);
+
+  const fragmentA = mk(new THREE.BoxGeometry(0.11 * s, 0.07 * s, 0.08 * s), wreckMaterial);
+  fragmentA.position.set(-0.08 * s, 0.2 * s, 0.09 * s);
+  fragmentA.rotation.set(0.38, -0.24, 0.12);
+  fragmentA.castShadow = true;
+  group.add(fragmentA);
+
+  const fragmentB = mk(new THREE.BoxGeometry(0.08 * s, 0.05 * s, 0.07 * s), wreckMaterial);
+  fragmentB.position.set(0.1 * s, 0.16 * s, 0.07 * s);
+  fragmentB.rotation.set(-0.22, 0.42, -0.24);
+  fragmentB.castShadow = true;
+  group.add(fragmentB);
+
+  const barrelSegments = Math.min(2 + level, 4);
+  for (let index = 0; index < barrelSegments; index += 1) {
+    const barrel = mk(
+      new THREE.CylinderGeometry(0.012 * s, 0.012 * s, (0.24 + index * 0.02) * s, 10),
+      wreckMaterial,
+    );
+    barrel.rotation.set(Math.PI / 2 + wreckCfg.barrelTilt * 0.22, -0.08 + index * 0.05, 0.16);
+    barrel.position.set(-0.02 * s + index * 0.015 * s, 0.19 * s, 0.15 * s);
+    barrel.castShadow = true;
+    group.add(barrel);
+  }
+
+  group.visible = false;
+  return group;
+}
+
+function buildDamageFxGroup(definition, level) {
+  const stats = definition.levels[level];
+  const s = 0.66 * stats.scale;
+  const dmg = TWR.damageState;
+  const group = new THREE.Group();
+  const flames = [];
+  const smokes = [];
+
+  for (let i = 0; i < 3; i += 1) {
+    const flame = mk(
+      new THREE.SphereGeometry(0.03 * s * (1 + i * 0.2), 8, 8),
+      new THREE.MeshBasicMaterial({
+        color: dmg.fireColor,
+        transparent: true,
+        opacity: 0.5,
+        depthWrite: false,
+      }),
+    );
+    flame.position.set((-0.05 + i * 0.05) * s, dmg.fireBaseHeight * s, (0.01 + i * 0.02) * s);
+    group.add(flame);
+    flames.push(flame);
+  }
+
+  for (let i = 0; i < 4; i += 1) {
+    const smoke = mk(
+      new THREE.SphereGeometry(0.045 * s * (1 + i * 0.16), 8, 8),
+      new THREE.MeshBasicMaterial({
+        color: dmg.smokeColor,
+        transparent: true,
+        opacity: 0.32,
+        depthWrite: false,
+      }),
+    );
+    smoke.position.set((-0.06 + i * 0.04) * s, (dmg.smokeBaseHeight + i * 0.07) * s, (-0.02 + i * 0.015) * s);
+    smoke.userData.baseY = smoke.position.y;
+    smoke.userData.baseX = smoke.position.x;
+    group.add(smoke);
+    smokes.push(smoke);
+  }
+
+  group.visible = false;
+  group.userData.flames = flames;
+  group.userData.smokes = smokes;
+  return group;
+}
+
+function buildTowerHpBar(definition, level, worldScale) {
+  const stats = definition.levels[level];
+  const cfg = TWR.hpBar;
+  const hpScale = worldScale * stats.scale;
+  const group = new THREE.Group();
+  group.position.y = cfg.yOffsetBase * hpScale;
+  group.renderOrder = cfg.renderOrder;
+
+  const background = mk(
+    new THREE.PlaneGeometry(cfg.widthBase * hpScale, cfg.heightBase * hpScale),
+    new THREE.MeshBasicMaterial({
+      color: cfg.backgroundColor,
+      transparent: true,
+      opacity: cfg.backgroundOpacity,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      depthTest: false,
+    }),
+  );
+  background.renderOrder = cfg.renderOrder;
+  group.add(background);
+
+  const fill = mk(
+    new THREE.PlaneGeometry(cfg.fillWidthBase * hpScale, cfg.fillHeightBase * hpScale),
+    new THREE.MeshBasicMaterial({
+      color: cfg.colors.healthy,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      depthTest: false,
+    }),
+  );
+  fill.position.z = 0.001;
+  fill.renderOrder = cfg.renderOrder + 1;
+  group.add(fill);
+
+  return {
+    group,
+    fill,
+    halfWidth: (cfg.fillWidthBase * hpScale) * 0.5,
+  };
 }
 
 export class TowerRenderer {
@@ -280,11 +437,25 @@ export class TowerRenderer {
     return mesh;
   }
 
-  sync(state, elapsedTime) {
+  buildWreck(towerTypeId, level) {
+    const wreck = buildWreckMesh(this.towerDefinitions[towerTypeId], level);
+    wreck.scale.setScalar(this.worldScale);
+    return wreck;
+  }
+
+  buildDamageFx(towerTypeId, level) {
+    const fx = buildDamageFxGroup(this.towerDefinitions[towerTypeId], level);
+    fx.scale.setScalar(this.worldScale);
+    return fx;
+  }
+
+  sync(state, elapsedTime, camera = null) {
+    const targetedTowerIds = new Set(state.enemies.map((enemy) => enemy.targetTowerId).filter(Boolean));
+    const hpCfg = TWR.hpBar;
     const nextIds = new Set(state.towers.map((tower) => tower.id));
     for (const [towerId, entry] of this.meshes.entries()) {
       if (!nextIds.has(towerId)) {
-        this.scene.remove(entry.mesh);
+        this.scene.remove(entry.root);
         this.meshes.delete(towerId);
       }
     }
@@ -293,15 +464,24 @@ export class TowerRenderer {
     for (const tower of state.towers) {
       let entry = this.meshes.get(tower.id);
       if (!entry || entry.level !== tower.level) {
-        if (entry) this.scene.remove(entry.mesh);
+        if (entry) this.scene.remove(entry.root);
+
+        const root = new THREE.Group();
         const mesh = this.buildMesh(tower.towerTypeId, tower.level);
-        mesh.position.set(tower.wx, 0, tower.wz);
-        this.scene.add(mesh);
-        entry = { mesh, level: tower.level };
+        const wreck = this.buildWreck(tower.towerTypeId, tower.level);
+        const damageFx = this.buildDamageFx(tower.towerTypeId, tower.level);
+        const hpBar = buildTowerHpBar(this.towerDefinitions[tower.towerTypeId], tower.level, this.worldScale);
+        root.add(mesh);
+        root.add(wreck);
+        root.add(damageFx);
+        root.add(hpBar.group);
+        this.scene.add(root);
+
+        entry = { root, mesh, wreck, damageFx, level: tower.level, hpBar };
         this.meshes.set(tower.id, entry);
       }
 
-      entry.mesh.position.set(tower.wx, 0, tower.wz);
+      entry.root.position.set(tower.wx, 0, tower.wz);
       const turret = entry.mesh.userData.turret;
       turret.rotation.y = tower.aimAngle;
       if (turret.userData.barrelPivot) {
@@ -311,9 +491,72 @@ export class TowerRenderer {
         turret.userData.gatlingGroup.rotation.z += tower.hasTarget ? anim.gatlingSpeedActive : anim.gatlingSpeedIdle;
       }
       if (turret.userData.led) {
-        turret.userData.led.material.emissiveIntensity = anim.ledPulse.base + Math.sin(elapsedTime * anim.ledPulse.frequency) * anim.ledPulse.amplitude;
+        turret.userData.led.material.emissiveIntensity =
+          anim.ledPulse.base + Math.sin(elapsedTime * anim.ledPulse.frequency) * anim.ledPulse.amplitude;
+      }
+
+      const hpRatio = tower.maxHp > 0 ? tower.hp / tower.maxHp : 0;
+      const showDamage = !tower.destroyed && (tower.damageFxActive || hpRatio <= TWR.damageState.threshold);
+      const showWreck = tower.destroyed;
+      const isTargeted = targetedTowerIds.has(tower.id);
+      entry.mesh.visible = !showWreck;
+      entry.wreck.visible = showWreck;
+      entry.damageFx.visible = showDamage || showWreck;
+      entry.hpBar.fill.scale.x = Math.max(0.01, hpRatio);
+      entry.hpBar.fill.position.x = -(1 - hpRatio) * entry.hpBar.halfWidth;
+      entry.hpBar.fill.material.color.setHex(
+        hpRatio < hpCfg.thresholds.critical
+          ? hpCfg.colors.critical
+          : hpRatio < hpCfg.thresholds.low
+            ? hpCfg.colors.low
+            : hpCfg.colors.healthy,
+      );
+      if (hpCfg.visibilityMode === 'damaged-or-targeted') {
+        entry.hpBar.group.visible = hpRatio < 0.999 || isTargeted || tower.destroyed;
+      } else {
+        entry.hpBar.group.visible = true;
+      }
+      if (entry.hpBar.group.visible && camera) {
+        entry.hpBar.group.quaternion.copy(camera.quaternion);
+      }
+
+      if (entry.damageFx.visible) {
+        const flames = entry.damageFx.userData.flames ?? [];
+        const smokes = entry.damageFx.userData.smokes ?? [];
+        for (let index = 0; index < flames.length; index += 1) {
+          const flame = flames[index];
+          const phase = elapsedTime * 9 + index * 0.9;
+          const flicker = 0.58 + Math.sin(phase) * 0.24;
+          flame.scale.setScalar(0.7 + flicker * (showWreck ? 1.2 : 0.9));
+          flame.material.opacity = showWreck ? 0.7 + Math.sin(phase * 0.7) * 0.1 : 0.52 + Math.sin(phase) * 0.08;
+        }
+        for (let index = 0; index < smokes.length; index += 1) {
+          const smoke = smokes[index];
+          const drift = Math.sin(elapsedTime * (1.8 + index * 0.22) + index);
+          smoke.position.y += showWreck ? 0.0015 : 0.001;
+          smoke.position.x += drift * 0.0002;
+          const fadeBase = showWreck ? 0.42 : 0.3;
+          smoke.material.opacity = fadeBase + Math.sin(elapsedTime * 0.8 + index) * 0.08;
+          const maxY = (smoke.userData.baseY ?? 0.4) + 0.55;
+          if (smoke.position.y > maxY) {
+            smoke.position.y = smoke.userData.baseY ?? 0.4;
+            smoke.position.x = smoke.userData.baseX ?? 0;
+          }
+        }
       }
     }
+  }
+
+  getTowerRoot(towerId) {
+    return this.meshes.get(towerId)?.root ?? null;
+  }
+
+  getTowerCenter(towerId) {
+    const root = this.getTowerRoot(towerId);
+    if (!root) return null;
+    const center = new THREE.Vector3();
+    root.getWorldPosition(center);
+    return center;
   }
 
   getTurret(towerId) {

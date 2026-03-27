@@ -49,6 +49,28 @@ Current generation path:
 
 ## Evaluated as references
 
+- Sketchfab, `Humvee` (UID `a331ab1396334beda7ae61711db59817`)
+  - URL: https://sketchfab.com/models/a331ab1396334beda7ae61711db59817
+  - Local export: `assets/models/vehicles/humvee_a331_turret.glb`
+  - Intended use: armed Humvee preset for `vehicle-lab` comparison
+  - License at import time: CC-BY
+
+- Sketchfab, `Ukrainian modified Humvee` (UID `e804fc759a744e4f9b96348713d5933a`)
+  - URL: https://sketchfab.com/3d-models/ukrainian-modified-humvee-e804fc759a744e4f9b96348713d5933a
+  - Local export: `assets/models/vehicles/humvee_e804_armed.glb`
+  - Intended use: armed enemy Humvee with turret yaw/pitch nodes
+  - License at import time: CC-BY
+
+- Sketchfab, `M163A2 VADS` (UID `b519c7ac1af34d5a970b96d59ca0ab1a`)
+  - URL: https://sketchfab.com/3d-models/m163a2-vads-b519c7ac1af34d5a970b96d59ca0ab1a
+  - Local export: `assets/models/vehicles/m163a2_vads.glb`
+  - Intended use: medium armor armed vehicle (`m163-vads-medium`)
+  - License at import time: CC-BY
+
+- Sketchfab, `Army Jeep Hummer Humvee HMMWV` (UID `484845939c50419cb3a581cc3546fadd`)
+  - URL: https://sketchfab.com/3d-models/army-jeep-hummer-humvee-hmmwv-484845939c50419cb3a581cc3546fadd
+  - Status: API download returned HTTP 403 from Sketchfab MCP flow (not imported)
+
 - Sketchfab, `Animated Game-Ready Turret`
   - URL: https://sketchfab.com/3d-models/animated-game-ready-turret-bbe8b20f9a624cdebd48e47a1cc0c585
   - Intended use: silhouette and low-poly donor/reference

@@ -9,11 +9,11 @@ function clamp(value, min, max) {
 }
 
 function resolveViewportHeight(win) {
-  return Math.floor(win.visualViewport?.height ?? win.innerHeight);
+  return Math.floor(win.innerHeight);
 }
 
 function resolveViewportWidth(win) {
-  return Math.floor(win.visualViewport?.width ?? win.innerWidth);
+  return Math.floor(win.innerWidth);
 }
 
 function resolvePanelHeight(config, win) {
@@ -30,13 +30,9 @@ export function createLayoutCoordinator(doc, config = LAYOUT_CONFIG) {
     const viewportWidth = resolveViewportWidth(win);
     const viewportHeight = resolveViewportHeight(win);
     const panelHeight = resolvePanelHeight(config, win);
-    const viewportTopOffset = Math.max(0, Math.floor(win.visualViewport?.offsetTop ?? 0));
-    const viewportLeftOffset = Math.max(0, Math.floor(win.visualViewport?.offsetLeft ?? 0));
-    const occludedBottom = Math.max(
-      0,
-      Math.floor(win.innerHeight - viewportHeight - viewportTopOffset),
-    );
-    const bottomInset = Math.max(occludedBottom, config.viewport.minBottomSafePx ?? 0);
+    const viewportTopOffset = 0;
+    const viewportLeftOffset = 0;
+    const bottomInset = Math.max(0, config.viewport.minBottomSafePx ?? 0);
     const bottomBuffer = config.viewport.windowBottomBufferPx + bottomInset;
     const topBuffer = config.viewport.windowTopBufferPx;
     const rightBuffer = config.viewport.windowRightBufferPx;

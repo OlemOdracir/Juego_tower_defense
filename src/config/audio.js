@@ -1,6 +1,7 @@
 export const AUDIO_CONFIG = {
   levels: {
     mg7Shot: 0.5,
+    enemyShot: 0.26,
     scoutEngine: 0.5,
     vehicleExplosion: 0.5,
   },
@@ -22,6 +23,11 @@ export const AUDIO_CONFIG = {
     playbackRateMin: 0.99,
     playbackRateRange: 0.04,
     cooldownMs: 0,
+  },
+  enemyShot: {
+    playbackRateMin: 0.92,
+    playbackRateRange: 0.08,
+    cooldownMs: 90,
   },
 
   vehicleExplosion: {

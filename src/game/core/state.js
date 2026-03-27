@@ -66,9 +66,15 @@ export function createInitialState(config) {
     spawnTimer: 0,
     activeWaveDefinition: null,
     waveSnapshot: null,
+    towerWaveBaseline: [],
     effects: [],
     uiDirty: true,
     worldDirty: true,
+    uiLockNoticeUntil: 0,
+    developerMode: {
+      enabled: false,
+      savedCredits: null,
+    },
     overlay: {
       visible: false,
       title: '',
@@ -89,6 +95,27 @@ export function createWaveSnapshot(state) {
   });
 }
 
+export function createTowerWaveBaseline(state) {
+  return cloneValue(
+    state.towers.map((tower) => ({
+      id: tower.id,
+      towerTypeId: tower.towerTypeId,
+      gx: tower.gx,
+      gy: tower.gy,
+      wx: tower.wx,
+      wz: tower.wz,
+      level: tower.level,
+      defenseTier: tower.defenseTier,
+      invested: tower.invested,
+      kills: tower.kills,
+      fireIndex: tower.fireIndex ?? 0,
+      aimAngle: tower.aimAngle ?? 0,
+      aimPitch: tower.aimPitch ?? 0,
+      cooldown: 0,
+    })),
+  );
+}
+
 export function resetWave(state, snapshot = state.waveSnapshot) {
   if (!snapshot) {
     return state;
@@ -105,10 +132,12 @@ export function resetWave(state, snapshot = state.waveSnapshot) {
   state.spawnQueue = [];
   state.spawnTimer = 0;
   state.activeWaveDefinition = null;
+  state.towerWaveBaseline = [];
   state.waveActive = false;
   state.gameOver = false;
   state.victory = false;
   state.overlay.visible = false;
+  state.uiLockNoticeUntil = 0;
   state.effects.length = 0;
   markUiDirty(state);
   markWorldDirty(state);

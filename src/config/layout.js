@@ -1,13 +1,13 @@
 export const LAYOUT_CONFIG = {
   panel: {
-    minHeightPx: 136,
-    viewportHeightPercent: 17,
-    maxHeightPx: 160,
-    safeBottomPx: 6,
+    minHeightPx: 186,
+    viewportHeightPercent: 23,
+    maxHeightPx: 232,
+    safeBottomPx: 8,
   },
   viewport: {
     windowBottomBufferPx: 0,
-    minBottomSafePx: 0,
+    minBottomSafePx: 8,
     windowTopBufferPx: 0,
     windowRightBufferPx: 0,
     windowLeftBufferPx: 0,

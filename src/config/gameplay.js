@@ -37,6 +37,17 @@ export const GAMEPLAY_CONFIG = {
       tier3Late: 0.82,
       tier2Late: 0.44,
     },
+    armedChanceByWave: {
+      wave2to3: { tier1: 0.28, tier2: 0, tier3: 0 },
+      wave4to6: { tier1: 0.42, tier2: 0.36, tier3: 0 },
+      wave7to8: { tier1: 0.5, tier2: 0.62, tier3: 0 },
+      wave9plus: { tier1: 0.56, tier2: 0.76, tier3: 0.55 },
+    },
+  },
+
+  combat: {
+    towerDamagedThreshold: 0.58,
+    towerDestroyedVfxHpFloor: 0,
   },
 
   ui: {

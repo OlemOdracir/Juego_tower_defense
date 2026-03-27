@@ -285,11 +285,19 @@ export class ProjectileRenderer {
       if (!mesh) {
         const s = this.worldScale;
         const pr = FX.projectile;
+        const isEnemyProjectile = projectile.sourceType === 'enemy';
+        const projectileColor = isEnemyProjectile ? FX.enemyProjectile.sphereColor : pr.sphere.color;
+        const trailColor = isEnemyProjectile ? FX.enemyProjectile.trailColor : pr.trail.color;
         const group = new THREE.Group();
-        group.add(mk(new THREE.SphereGeometry(pr.sphere.radius * s, pr.sphere.segments, pr.sphere.segments), new THREE.MeshBasicMaterial({ color: pr.sphere.color })));
+        group.add(
+          mk(
+            new THREE.SphereGeometry(pr.sphere.radius * s, pr.sphere.segments, pr.sphere.segments),
+            new THREE.MeshBasicMaterial({ color: projectileColor }),
+          ),
+        );
         const trail = mk(
           new THREE.CylinderGeometry(pr.trail.topRadius * s, pr.trail.bottomRadius * s, pr.trail.height * s, 4),
-          new THREE.MeshBasicMaterial({ color: pr.trail.color, transparent: true, opacity: pr.trail.opacity }),
+          new THREE.MeshBasicMaterial({ color: trailColor, transparent: true, opacity: pr.trail.opacity }),
         );
         trail.rotation.x = Math.PI / 2;
         trail.position.z = pr.trail.zOffset * s;
@@ -305,7 +313,7 @@ export class ProjectileRenderer {
     }
   }
 
-  handleEffects(effects, towerRenderer) {
+  handleEffects(effects, towerRenderer, enemyRenderer = null) {
     for (const effect of effects) {
       if (effect.type === 'projectile-fired') {
         const turret = towerRenderer.getTurret(effect.towerId);
@@ -322,6 +330,48 @@ export class ProjectileRenderer {
           volume: AUDIO_CONFIG.levels.mg7Shot,
           playbackRate: mg7.playbackRateMin + Math.random() * mg7.playbackRateRange,
           cooldownMs: mg7.cooldownMs,
+        });
+      } else if (effect.type === 'enemy-projectile-fired') {
+        const mf = FX.enemyMuzzleFlash;
+        const muzzleWorldPosition = enemyRenderer?.getMuzzleWorldPosition(
+          effect.enemyId,
+          effect.fireIndex ?? 0,
+          (mf.forwardOffset ?? 0) * this.worldScale,
+        );
+        const flashPosition = muzzleWorldPosition ?? new THREE.Vector3(effect.position.x, effect.position.y, effect.position.z);
+        const flash = mk(
+          new THREE.SphereGeometry(mf.radius * this.worldScale, mf.segments, mf.segments),
+          new THREE.MeshBasicMaterial({ color: mf.color }),
+        );
+        flash.position.copy(flashPosition);
+        this.scene.add(flash);
+        this.particles.push({
+          mesh: flash,
+          life: mf.lifetime,
+          totalLife: mf.lifetime,
+          type: 'impact-pulse',
+          growthRate: 20,
+          maxOpacity: 1,
+        });
+        const flashCore = mk(
+          new THREE.SphereGeometry(mf.radius * this.worldScale * 0.48, mf.segments, mf.segments),
+          new THREE.MeshBasicMaterial({ color: 0xffe2b8 }),
+        );
+        flashCore.position.copy(flashPosition);
+        this.scene.add(flashCore);
+        this.particles.push({
+          mesh: flashCore,
+          life: mf.lifetime * 0.8,
+          totalLife: mf.lifetime * 0.8,
+          type: 'impact-pulse',
+          growthRate: 12,
+          maxOpacity: 1,
+        });
+        const enemyShot = AUDIO_CONFIG.enemyShot;
+        this.sfxPlayer?.play('enemy-shot', {
+          volume: AUDIO_CONFIG.levels.enemyShot,
+          playbackRate: enemyShot.playbackRateMin + Math.random() * enemyShot.playbackRateRange,
+          cooldownMs: enemyShot.cooldownMs,
         });
       } else if (effect.type === 'hit' || effect.type === 'enemy-killed') {
         if (effect.type === 'hit') {
@@ -430,6 +480,47 @@ export class ProjectileRenderer {
             maxOpacity: 1,
           });
         }
+      } else if (effect.type === 'tower-hit') {
+        const hs = FX.towerHitSpark;
+        const spark = mk(
+          new THREE.SphereGeometry(hs.radius * this.worldScale, hs.segments, hs.segments),
+          new THREE.MeshBasicMaterial({ color: hs.color, transparent: true, opacity: hs.opacity }),
+        );
+        spark.position.set(effect.position.x, effect.position.y, effect.position.z);
+        this.scene.add(spark);
+        this.particles.push({
+          mesh: spark,
+          life: hs.lifetime,
+          totalLife: hs.lifetime,
+          type: 'impact-pulse',
+          growthRate: hs.growthRate,
+          maxOpacity: hs.opacity,
+        });
+      } else if (effect.type === 'tower-destroyed') {
+        const burst = FX.towerDestroyedBurst;
+        const blast = mk(
+          new THREE.SphereGeometry(burst.radius * this.worldScale, burst.segments, burst.segments),
+          new THREE.MeshBasicMaterial({ color: burst.color, transparent: true, opacity: burst.opacity }),
+        );
+        blast.position.set(
+          effect.position.x,
+          effect.position.y + burst.yOffset * this.worldScale,
+          effect.position.z,
+        );
+        this.scene.add(blast);
+        this.particles.push({
+          mesh: blast,
+          life: burst.lifetime,
+          totalLife: burst.lifetime,
+          type: 'explosion-flash',
+          growthRate: burst.growthRate,
+          maxOpacity: burst.opacity,
+        });
+        this.spawnSmokePuff(effect.position, FX.smokeBurst, {
+          offsetY: FX.smokeBurst.yOffset * this.worldScale,
+          lifetime: FX.smokeBurst.lifetime * 1.2,
+          opacity: FX.smokeBurst.opacity,
+        });
       }
     }
   }

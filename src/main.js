@@ -11,6 +11,7 @@ import {
   startWave,
   tickSimulation,
   upgradeTower,
+  upgradeTowerDefense,
 } from './game/core/index.js';
 import { GAMEPLAY_CONFIG } from './config/gameplay.js';
 import { FRAMING_CONFIG } from './config/framing.js';
@@ -42,6 +43,7 @@ mapRenderer.build();
 const sfxPlayer = new SfxPlayer();
 sfxPlayer.attachUnlockListeners(window);
 sfxPlayer.load('mg7-shot', new URL('../assets/audio/mg7/mg7-single-shot.mp3', import.meta.url).href).catch(() => {});
+sfxPlayer.load('enemy-shot', new URL('../assets/audio/mg7/gun-shots-gun-firing.mp3', import.meta.url).href).catch(() => {});
 sfxPlayer.load('scout-engine', new URL('../assets/audio/vehicles/light-vehicle-engine.wav', import.meta.url).href).catch(() => {});
 sfxPlayer.load('vehicle-explosion', new URL('../assets/audio/vehicles/car-explosion-debris.mp3', import.meta.url).href).catch(() => {});
 
@@ -64,6 +66,110 @@ let didDrag = false;
 let lastMouseX = 0;
 let elapsedTime = 0;
 let pendingSellTowerId = null;
+
+const devModeToggleEl = document.getElementById('dev-mode-toggle');
+const devConfigEl = document.getElementById('dev-config');
+const devWaveCountEl = document.getElementById('dev-wave-count');
+const devWaveIntervalEl = document.getElementById('dev-wave-interval');
+const devEnemyListEl = document.getElementById('dev-enemy-list');
+const devSelectAllEl = document.getElementById('dev-select-all');
+const devClearAllEl = document.getElementById('dev-clear-all');
+const devSelectedEnemyIds = new Set();
+
+function notifyWaveLock() {
+  state.uiLockNoticeUntil = Date.now() + 1400;
+  renderUi();
+}
+
+function setDeveloperMode(enabled) {
+  const shouldEnable = Boolean(enabled);
+  if (shouldEnable) {
+    if (!state.developerMode.enabled && Number.isFinite(state.credits)) {
+      state.developerMode.savedCredits = state.credits;
+    }
+    state.developerMode.enabled = true;
+    state.credits = Number.POSITIVE_INFINITY;
+  } else {
+    state.developerMode.enabled = false;
+    if (!Number.isFinite(state.credits)) {
+      state.credits = state.developerMode.savedCredits ?? state.config.mapDefinition.initialCredits;
+    }
+  }
+  if (devConfigEl) devConfigEl.hidden = !shouldEnable;
+  state.uiDirty = true;
+}
+
+function syncDeveloperCredits() {
+  if (state.developerMode.enabled) {
+    state.credits = Number.POSITIVE_INFINITY;
+    state.uiDirty = true;
+  }
+}
+
+function buildDevWaveOverride() {
+  if (!state.developerMode.enabled) return null;
+  const selectedEnemyIds = Array.from(devSelectedEnemyIds).filter((enemyTypeId) => config.enemyDefinitions[enemyTypeId]);
+  if (selectedEnemyIds.length === 0) return null;
+
+  const requestedCount = Number.parseInt(devWaveCountEl?.value ?? '16', 10);
+  const count = Math.max(1, Math.min(200, Number.isFinite(requestedCount) ? requestedCount : 16));
+  const requestedInterval = Number.parseFloat(devWaveIntervalEl?.value ?? '0.72');
+  const interval = Math.max(0.1, Math.min(5, Number.isFinite(requestedInterval) ? requestedInterval : 0.72));
+  const spawns = Array.from(
+    { length: count },
+    () => selectedEnemyIds[Math.floor(Math.random() * selectedEnemyIds.length)],
+  );
+
+  return {
+    interval,
+    spawns,
+  };
+}
+
+function populateDevEnemyList() {
+  if (!devEnemyListEl) return;
+  devEnemyListEl.innerHTML = '';
+  const entries = Object.values(config.enemyDefinitions).sort((a, b) => a.displayName.localeCompare(b.displayName));
+  for (const enemyDef of entries) {
+    const row = document.createElement('label');
+    row.className = 'dev-enemy-item';
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.value = enemyDef.id;
+    checkbox.checked = devSelectedEnemyIds.has(enemyDef.id);
+    checkbox.addEventListener('change', () => {
+      if (checkbox.checked) devSelectedEnemyIds.add(enemyDef.id);
+      else devSelectedEnemyIds.delete(enemyDef.id);
+    });
+    const label = document.createElement('span');
+    label.textContent = `${enemyDef.displayName} (${enemyDef.id})`;
+    row.appendChild(checkbox);
+    row.appendChild(label);
+    devEnemyListEl.appendChild(row);
+  }
+}
+
+function setupDeveloperControls() {
+  if (!devModeToggleEl) return;
+  populateDevEnemyList();
+  if (devConfigEl) devConfigEl.hidden = true;
+
+  devModeToggleEl.addEventListener('change', () => {
+    setDeveloperMode(devModeToggleEl.checked);
+    renderUi();
+  });
+
+  devSelectAllEl?.addEventListener('click', () => {
+    devSelectedEnemyIds.clear();
+    Object.keys(config.enemyDefinitions).forEach((id) => devSelectedEnemyIds.add(id));
+    populateDevEnemyList();
+  });
+
+  devClearAllEl?.addEventListener('click', () => {
+    devSelectedEnemyIds.clear();
+    populateDevEnemyList();
+  });
+}
 
 function renderUi() {
   hudPresenter.render(state);
@@ -102,19 +208,28 @@ function closeConfirmDialog() {
 }
 
 window.startWave = function startWaveHandler() {
-  if (startWave(state)) {
+  syncDeveloperCredits();
+  const overrideWaveDefinition = buildDevWaveOverride();
+  if (startWave(state, { overrideWaveDefinition })) {
     renderUi();
   }
 };
 
 window.resetWave = function resetWaveHandler() {
   resetWave(state);
+  syncDeveloperCredits();
   closeConfirmDialog();
   renderUi();
 };
 
 window.resetAll = function resetAllHandler() {
+  const keepDeveloperMode = Boolean(devModeToggleEl?.checked);
   resetAll(state);
+  if (keepDeveloperMode) {
+    setDeveloperMode(true);
+  } else {
+    setDeveloperMode(false);
+  }
   closeConfirmDialog();
   hoveredCell = null;
   renderUi();
@@ -122,12 +237,31 @@ window.resetAll = function resetAllHandler() {
 
 window.doUpgrade = function doUpgradeHandler() {
   if (!state.selectedTowerId) return;
+  if (state.waveActive) {
+    notifyWaveLock();
+    return;
+  }
   if (upgradeTower(state, state.selectedTowerId)) {
     renderUi();
   }
 };
 
+window.doUpgradeDefense = function doUpgradeDefenseHandler() {
+  if (!state.selectedTowerId) return;
+  if (state.waveActive) {
+    notifyWaveLock();
+    return;
+  }
+  if (upgradeTowerDefense(state, state.selectedTowerId)) {
+    renderUi();
+  }
+};
+
 window.askSell = function askSellHandler() {
+  if (state.waveActive) {
+    notifyWaveLock();
+    return;
+  }
   const tower = getSelectedTower();
   if (!tower) return;
   const definition = config.towerDefinitions[tower.towerTypeId];
@@ -193,6 +327,10 @@ sceneRuntime.renderer.domElement.addEventListener('click', () => {
 
   const cellValue = state.grid[hoveredCell.gy][hoveredCell.gx];
   if (cellValue === 0) {
+    if (state.waveActive) {
+      notifyWaveLock();
+      return;
+    }
     const tower = placeTower(state, { towerTypeId: 'mg7-vulcan', gx: hoveredCell.gx, gy: hoveredCell.gy });
     if (tower) renderUi();
     return;
@@ -265,10 +403,10 @@ function gameLoop() {
   elapsedTime += dt;
 
   tickSimulation(state, dt);
-  towerRenderer.sync(state, elapsedTime);
+  towerRenderer.sync(state, elapsedTime, sceneRuntime.camera);
   enemyRenderer.sync(state, sceneRuntime.camera, sceneRuntime.cameraAngle, elapsedTime);
   projectileRenderer.syncProjectiles(state);
-  projectileRenderer.handleEffects(consumeEffects(state), towerRenderer);
+  projectileRenderer.handleEffects(consumeEffects(state), towerRenderer, enemyRenderer);
   projectileRenderer.updateParticles(dt);
 
   if (state.uiDirty) {
@@ -281,6 +419,7 @@ function gameLoop() {
 }
 
 renderUi();
+setupDeveloperControls();
 gameLoop();
 
 console.log('Iron Bastion v0.2 loaded');

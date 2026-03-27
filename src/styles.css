@@ -112,6 +112,97 @@ canvas { display: block; }
 }
 .hud-btn:hover { background: #334155; color: #f1f5f9; }
 
+#dev-controls {
+  position: absolute;
+  top: 56px;
+  right: 14px;
+  z-index: 16;
+  width: 260px;
+  border: 1px solid rgba(71, 85, 105, .65);
+  border-radius: 10px;
+  background: rgba(15, 23, 42, .88);
+  backdrop-filter: blur(6px);
+  color: #cbd5e1;
+  box-shadow: 0 12px 26px rgba(2, 6, 23, .45);
+}
+.dev-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.dev-toggle input {
+  accent-color: #22c55e;
+}
+#dev-config {
+  border-top: 1px solid rgba(71, 85, 105, .45);
+  padding: 8px 10px 10px;
+}
+.dev-help {
+  font-size: 10px;
+  color: #8da0b3;
+  margin-bottom: 8px;
+}
+.dev-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.dev-field span {
+  font-size: 11px;
+  color: #bfd0e1;
+}
+.dev-field input {
+  width: 96px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  border: 1px solid #334155;
+  background: #0f172a;
+  color: #f8fafc;
+  font-size: 11px;
+}
+.dev-actions {
+  display: flex;
+  gap: 6px;
+  margin: 6px 0 8px;
+}
+.dev-actions button {
+  flex: 1 1 0;
+  border: 1px solid #334155;
+  background: #1e293b;
+  color: #dbe5ef;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 5px 8px;
+  cursor: pointer;
+}
+.dev-actions button:hover {
+  background: #334155;
+}
+#dev-enemy-list {
+  max-height: 176px;
+  overflow: auto;
+  display: grid;
+  gap: 4px;
+  padding-right: 2px;
+}
+.dev-enemy-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #d7e1ea;
+}
+.dev-enemy-item input {
+  accent-color: #22c55e;
+}
+
 .tower-selector {
   position: absolute;
   bottom: var(--cfg-lower-ui-gap);
@@ -235,7 +326,8 @@ canvas { display: block; }
 
 body.overlay-active .tower-selector,
 body.overlay-active #wave-btn,
-body.overlay-active #tip {
+body.overlay-active #tip,
+body.overlay-active #dev-controls {
   opacity: 0;
   pointer-events: none;
 }
@@ -464,19 +556,20 @@ body.overlay-active #tip {
 
 #actions-section {
   width: 222px;
-  padding: 8px 8px;
+  padding: 6px 8px;
   display: flex;
   flex-direction: column;
   justify-content: stretch;
-  gap: 8px;
+  gap: 6px;
   flex-shrink: 0;
   border-left: 1px solid rgba(123, 151, 176, .16);
   background: linear-gradient(180deg, rgba(17, 29, 41, .4), rgba(10, 18, 27, .18));
+  overflow: hidden;
 }
 
 .btn-upgrade {
   width: 100%;
-  flex: 1;
+  height: 52px;
   border-radius: 15px;
   border: 2px solid #6dbd75;
   font-weight: 900;
@@ -485,13 +578,12 @@ body.overlay-active #tip {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 5px;
+  gap: 2px;
   background: linear-gradient(180deg, #5fa95a 0%, #468d4d 100%);
   color: #f4fff0;
   text-transform: uppercase;
   letter-spacing: 1px;
   transition: all 0.15s;
-  min-height: 0;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, .22),
     0 10px 20px rgba(0, 0, 0, .2);
@@ -505,13 +597,48 @@ body.overlay-active #tip {
   cursor: default;
   text-shadow: none;
 }
-.btn-upgrade svg { width: 24px; height: 24px; }
-.btn-upgrade .btn-label { font-size: 18px; letter-spacing: .7px; }
-.btn-upgrade .btn-price { font-size: 17px; font-weight: 900; }
+.btn-upgrade svg { width: 16px; height: 16px; }
+.btn-upgrade .btn-label { font-size: 13px; letter-spacing: .5px; }
+.btn-upgrade .btn-price { font-size: 12px; font-weight: 900; }
+
+.btn-defense {
+  width: 100%;
+  height: 52px;
+  border-radius: 14px;
+  border: 1px solid rgba(102, 220, 229, .42);
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  background: linear-gradient(180deg, #1f6a7a 0%, #18495a 100%);
+  color: #e4fbff;
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  transition: all 0.15s;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .2),
+    0 10px 20px rgba(0, 0, 0, .2);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, .3);
+}
+.btn-defense svg { width: 16px; height: 16px; }
+.btn-defense .btn-label { font-size: 13px; letter-spacing: .4px; }
+.btn-defense .btn-price { font-size: 12px; font-weight: 900; color: #c2f6ff; }
+.btn-defense:hover { filter: brightness(1.04); }
+.btn-defense:disabled,
+.btn-defense-max {
+  background: linear-gradient(180deg, #2f3d4e 0%, #1d2938 100%);
+  border-color: #47586c;
+  color: #8ea3b2;
+  cursor: default;
+  text-shadow: none;
+}
 
 .btn-sell {
   width: 100%;
-  height: 70px;
+  height: 52px;
   border-radius: 15px;
   border: 1px solid rgba(155, 171, 188, .16);
   font-weight: 800;
@@ -520,7 +647,7 @@ body.overlay-active #tip {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 2px;
   background:
     linear-gradient(180deg, #555d68 0%, #383f47 100%);
   color: #eef3f8;
@@ -538,13 +665,21 @@ body.overlay-active #tip {
   opacity: .7;
   filter: saturate(.72);
 }
-.btn-sell svg { width: 28px; height: 28px; }
-.btn-sell .btn-label { font-size: 17px; text-transform: uppercase; letter-spacing: .4px; }
-.btn-sell .btn-price { font-size: 16px; font-weight: 900; color: #f3de8e; }
+.btn-sell svg { width: 16px; height: 16px; }
+.btn-sell .btn-label { font-size: 13px; text-transform: uppercase; letter-spacing: .4px; }
+.btn-sell .btn-price { font-size: 12px; font-weight: 900; color: #f3de8e; }
+
+.action-lock-note {
+  font-size: 10px;
+  text-align: center;
+  color: #fbbf24;
+  letter-spacing: .3px;
+  padding-top: 2px;
+}
 
 .btn-maxlevel {
   width: 100%;
-  flex: 1;
+  height: 52px;
   border-radius: 15px;
   border: 2px solid #7c3aed;
   font-weight: 800;
@@ -558,11 +693,11 @@ body.overlay-active #tip {
   cursor: default;
   text-transform: uppercase;
   letter-spacing: 1px;
-  min-height: 0;
+  min-height: 52px;
 }
-.btn-maxlevel svg { width: 22px; height: 22px; }
-.btn-maxlevel .btn-label { font-size: 14px; letter-spacing: .8px; }
-.btn-maxlevel .btn-price { font-size: 16px; }
+.btn-maxlevel svg { width: 16px; height: 16px; }
+.btn-maxlevel .btn-label { font-size: 12px; letter-spacing: .5px; }
+.btn-maxlevel .btn-price { font-size: 12px; }
 
 @media (max-width: 1220px) {
   #panel {
@@ -607,11 +742,13 @@ body.overlay-active #tip {
   }
 
   .btn-upgrade .btn-label,
+  .btn-defense .btn-label,
   .btn-sell .btn-label {
     font-size: 19px;
   }
 
   .btn-upgrade .btn-price,
+  .btn-defense .btn-price,
   .btn-sell .btn-price {
     font-size: 18px;
   }
@@ -717,6 +854,7 @@ body.overlay-active #tip {
   }
 
   .btn-upgrade {
+    height: 44px;
     border-radius: 12px;
     gap: 3px;
   }
@@ -732,11 +870,31 @@ body.overlay-active #tip {
   }
 
   .btn-upgrade .btn-price {
-    font-size: 12px;
+    font-size: 11px;
+  }
+
+  .btn-defense {
+    height: 44px;
+    border-radius: 12px;
+    gap: 2px;
+  }
+
+  .btn-defense svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .btn-defense .btn-label {
+    font-size: 11px;
+    letter-spacing: .4px;
+  }
+
+  .btn-defense .btn-price {
+    font-size: 10px;
   }
 
   .btn-sell {
-    height: 58px;
+    height: 44px;
     border-radius: 12px;
     gap: 2px;
   }
@@ -751,6 +909,6 @@ body.overlay-active #tip {
   }
 
   .btn-sell .btn-price {
-    font-size: 12px;
+    font-size: 10px;
   }
 }

@@ -1,3 +1,5 @@
+import { MUNITION_CLASSES } from '../enemies/vehicle-combat.js';
+
 export const mg7TowerDefinition = {
   id: 'mg7-vulcan',
   displayName: 'MG-7 VULCAN',
@@ -9,6 +11,7 @@ export const mg7TowerDefinition = {
     sellRatio: 0.6,
   },
   combatModel: {
+    damageType: MUNITION_CLASSES.lightBallistic,
     projectileSpeed: 14,
     projectileSizeBase: 0.02,
     projectileSizePerLevel: 0.004,
@@ -46,8 +49,33 @@ export const mg7TowerDefinition = {
       rate: 13,
       range: 4.3,
       scale: 1.6,
+      armor: 12,
+      hp: 360,
     },
   },
+  defenseLevels: [
+    {
+      label: 'Blindaje Ligero',
+      armorClass: 'light',
+      maxHp: 180,
+      armor: 3,
+      upgradeCost: 140,
+    },
+    {
+      label: 'Blindaje Medio',
+      armorClass: 'medium',
+      maxHp: 260,
+      armor: 7,
+      upgradeCost: 220,
+    },
+    {
+      label: 'Blindaje Pesado',
+      armorClass: 'heavy',
+      maxHp: 360,
+      armor: 12,
+      upgradeCost: null,
+    },
+  ],
   levels: [
     { label: 'Canon Simple', damage: 5, rate: 2.5, range: 3.2, scale: 1, upgradeCost: 50 },
     { label: 'Canon Doble', damage: 8, rate: 3.5, range: 3.4, scale: 1.15, upgradeCost: 100 },
